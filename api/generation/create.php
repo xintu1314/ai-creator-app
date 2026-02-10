@@ -1,20 +1,11 @@
 <?php
 /**
  * POST /api/generation/create.php
- * 创建生成任务（占位接口，后续接入真实生图/生视频 API）
- *
- * 请求体 JSON:
- * - prompt: 提示词
- * - model: 模型名称
- * - type: image|video
- * - aspectRatio: 1:1|2:3|3:2|3:4|4:3|9:16|16:9|9:21|21:9
- * - mode: single|multiple (图片)
- * - quality: 2k|4k (图片) | standard|high (视频)
- * - count: 图片张数 (可选)
- * - duration: 视频时长 5|10 (可选)
+ * 创建生成任务（写入 tasks 表，后续接入真实生图/生视频 API）
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
+require_once __DIR__ . '/../common/db.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Method not allowed', 405);
@@ -36,14 +27,33 @@ if (!in_array($type, ['image', 'video'])) {
     exit;
 }
 
-// TODO: 接入真实的生图/生视频 API
-// 根据 model、type 调用对应的第三方接口（可灵、banana pro 等）
-// 视频需处理首帧、尾帧上传（multipart/form-data）
-
 $taskId = 'task_' . uniqid() . '_' . time();
+$params = [
+    'prompt' => $prompt,
+    'model' => $input['model'] ?? '',
+    'aspectRatio' => $input['aspectRatio'] ?? ($type === 'image' ? '3:4' : '16:9'),
+    'mode' => $input['mode'] ?? 'single',
+    'quality' => $input['quality'] ?? '2k',
+    'duration' => $input['duration'] ?? 5,
+];
 
-json_success([
-    'taskId' => $taskId,
-    'status' => 'pending',
-    'message' => '任务已创建，等待接入真实生成接口',
-]);
+try {
+    $pdo = get_db();
+    $stmt = $pdo->prepare("
+        INSERT INTO tasks (id, user_id, type, status, params_json)
+        VALUES (:id, 0, :type, 'pending', :params)
+    ");
+    $stmt->execute([
+        'id' => $taskId,
+        'type' => $type,
+        'params' => json_encode($params, JSON_UNESCAPED_UNICODE),
+    ]);
+
+    json_success([
+        'taskId' => $taskId,
+        'status' => 'pending',
+        'message' => '任务已创建，等待接入真实生成接口',
+    ]);
+} catch (Throwable $e) {
+    json_error('任务创建失败：' . $e->getMessage(), 500);
+}

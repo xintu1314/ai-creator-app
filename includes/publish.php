@@ -218,12 +218,14 @@ async function handlePublishSubmit(e) {
     }
 
     try {
+        const modelName = document.getElementById('selected-model-display').textContent;
         const response = await fetch('api/publish/create.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contentType,
                 modelId,
+                modelName: modelName !== '请选择模型' ? modelName : '',
                 category,
                 title,
                 content
