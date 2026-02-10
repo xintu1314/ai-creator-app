@@ -1,14 +1,5 @@
 <?php
-$imageModels = [
-    ['id' => 'banana-pro', 'name' => 'banana pro', 'description' => '高性能图片生成模型', 'icon' => 'banana', 'tags' => ['图片生成']],
-];
-
-$videoModels = [
-    ['id' => 'kling', 'name' => '可灵', 'description' => '高质量视频生成模型', 'icon' => 'kling', 'tags' => ['视频生成', '首尾帧']],
-    ['id' => 'sora2', 'name' => 'sora2', 'description' => '先进的视频生成模型', 'icon' => 'sora', 'tags' => ['视频生成', '首尾帧']],
-];
-
-$categories = ['室内', '景观', '建筑', '电商', '人物', '动物', '自然'];
+// $imageModels, $videoModels, $categories 由 index.php 从 api/data 加载
 $contentType = $_POST['content_type'] ?? 'image';
 $selectedModel = $_POST['selected_model'] ?? '';
 $selectedCategory = $_POST['selected_category'] ?? '';
@@ -19,7 +10,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
     <h1 class="text-2xl font-semibold text-[#1A1A1A] mb-6">发布模板</h1>
     
     <div class="bg-white rounded-lg p-6 border border-[#E5E5E5]">
-        <form method="POST" action="?tab=publish">
+        <form id="publish-form" method="POST" action="?tab=publish" onsubmit="return handlePublishSubmit(event)">
             <!-- Content Type Selection (Image/Video) -->
             <div class="mb-6">
                 <label class="block text-sm font-medium text-[#1A1A1A] mb-3">类型</label>
@@ -210,5 +201,48 @@ function selectPublishModel(modelId, modelName) {
     document.getElementById('selected-model-display').classList.remove('text-[#999999]');
     document.getElementById('selected-model-display').classList.add('text-[#1A1A1A]');
     closePublishModelDialog();
+}
+
+async function handlePublishSubmit(e) {
+    e.preventDefault();
+    const form = document.getElementById('publish-form');
+    const contentType = document.getElementById('content_type').value;
+    const modelId = document.getElementById('selected_model').value;
+    const category = document.getElementById('selected_category').value;
+    const title = form.querySelector('[name="title"]').value.trim();
+    const content = form.querySelector('[name="content"]').value.trim();
+
+    if (!modelId || !category || !title || !content) {
+        alert('请填写完整：模型、分类、标题、内容');
+        return false;
+    }
+
+    try {
+        const response = await fetch('api/publish/create.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contentType,
+                modelId,
+                category,
+                title,
+                content
+            }),
+        });
+        const data = await response.json();
+        if (data.success) {
+            alert('发布成功！');
+            form.reset();
+            document.getElementById('selected_model').value = '';
+            document.getElementById('selected-model-display').textContent = '请选择模型';
+            document.getElementById('selected-model-display').classList.add('text-[#999999]');
+        } else {
+            alert('发布失败：' + (data.message || '未知错误'));
+        }
+    } catch (err) {
+        console.error(err);
+        alert('请求失败，请稍后重试');
+    }
+    return false;
 }
 </script>

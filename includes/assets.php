@@ -1,41 +1,8 @@
 <?php
-// 模拟历史记录数据
-$historyItems = [
-    [
-        'id' => 'hist-1',
-        'title' => '生成的图片1',
-        'image' => 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&h=500&fit=crop',
-        'type' => 'image',
-        'model' => 'banana pro',
-        'prompt' => '一个美丽的风景画',
-        'createdAt' => '2026-02-05 10:30',
-    ],
-    [
-        'id' => 'hist-2',
-        'title' => '生成的视频1',
-        'image' => 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=500&fit=crop',
-        'type' => 'video',
-        'model' => '可灵',
-        'prompt' => '一只蝴蝶在花丛中飞舞',
-        'createdAt' => '2026-02-05 09:15',
-    ],
-    [
-        'id' => 'hist-3',
-        'title' => '生成的图片2',
-        'image' => 'https://images.unsplash.com/photo-1576919228236-a097c32a5cd4?w=400&h=500&fit=crop',
-        'type' => 'image',
-        'model' => 'banana pro',
-        'prompt' => '圣诞主题的海报设计',
-        'createdAt' => '2026-02-04 16:20',
-    ],
-];
-
+// 从共享数据层加载资产（与 api/assets 同源）
 $activeFilter = $_GET['filter'] ?? 'all';
-$filteredHistory = $activeFilter === 'all' 
-    ? $historyItems 
-    : array_filter($historyItems, function($item) use ($activeFilter) {
-        return $item['type'] === $activeFilter;
-    });
+$historyItems = get_assets($activeFilter);
+$filteredHistory = $historyItems; // get_assets 已按 filter 过滤
 ?>
 <div class="max-w-[1200px] mx-auto p-6">
     <h1 class="text-2xl font-semibold text-[#1A1A1A] mb-6">资产</h1>

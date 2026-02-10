@@ -1,7 +1,6 @@
 <?php
-// 教程数据从后端获取（通过数据库或API）
-// 这里使用空数组作为示例，实际应该从数据库查询
-$tutorials = [];
+// 从共享数据层加载教程（与 api/tutorials 同源）
+$tutorials = get_tutorials();
 ?>
 <div class="max-w-[1200px] mx-auto p-6">
     <h1 class="text-2xl font-semibold text-[#1A1A1A] mb-6">教程</h1>

@@ -5,7 +5,7 @@
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
+require_once __DIR__ . '/../data/categories.php';
 
-$categories = ['室内', '景观', '建筑', '电商', '人物', '动物', '自然'];
-
-json_success($categories);
+$data = get_categories();
+json_success($data);

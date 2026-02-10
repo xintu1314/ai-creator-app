@@ -186,7 +186,7 @@ function useTemplate(template) {
     alert('模板功能：' + template.title);
 }
 
-// 生成处理
+// 生成处理 - 调用后端 API
 async function handleGenerate() {
     const promptInput = document.getElementById('prompt-input');
     if (!promptInput) return;
@@ -199,46 +199,42 @@ async function handleGenerate() {
 
     const type = window.currentCreationType || 'image';
     const selectedModel = document.getElementById('selected-model')?.textContent || '';
-    const aspectRatio = document.getElementById('aspect-ratio')?.textContent || '3:4';
     const settings = window.currentSettings || {};
+    
+    const aspectRatio = type === 'video' 
+        ? (document.getElementById('video-aspect-ratio')?.textContent || '16:9')
+        : (document.getElementById('aspect-ratio')?.textContent || '3:4');
+
+    const payload = {
+        prompt,
+        model: selectedModel,
+        type,
+        aspectRatio,
+        mode: settings.mode || 'single',
+        quality: settings.quality || '2k',
+    };
+    
+    if (type === 'video') {
+        const durationEl = document.getElementById('video-duration');
+        payload.duration = durationEl ? parseInt(durationEl.textContent) || 5 : 5;
+        payload.quality = window.videoQuality || 'standard';
+    }
 
     try {
-        // 这里可以调用API
-        console.log('生成参数:', {
-            prompt,
-            model: selectedModel,
-            type,
-            aspectRatio,
-            mode: settings.mode || 'single',
-            quality: settings.quality || '2k'
-        });
-        
-        alert('生成功能需要连接后端API。\n\n参数：\n提示词：' + prompt + '\n模型：' + selectedModel + '\n类型：' + type);
-        
-        // 实际API调用示例（需要后端支持）
-        /*
         const response = await fetch('api/generation/create.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                prompt,
-                model: selectedModel,
-                type,
-                aspectRatio,
-                mode: settings.mode || 'single',
-                quality: settings.quality || '2k',
-            }),
+            body: JSON.stringify(payload),
         });
 
         const data = await response.json();
         if (data.success) {
-            alert('生成任务已创建！');
+            alert('生成任务已创建！任务ID：' + (data.data?.taskId || ''));
         } else {
-            alert('生成失败：' + data.message);
+            alert('生成失败：' + (data.message || '未知错误'));
         }
-        */
     } catch (error) {
         console.error('Error:', error);
         alert('请求失败，请稍后重试');
