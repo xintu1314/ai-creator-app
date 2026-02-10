@@ -53,7 +53,7 @@ Content-Type: application/json
 }
 ```
 
-### 7. 发布模板（占位）
+### 7. 发布模板
 
 ```
 POST /api/publish/create.php
@@ -64,9 +64,41 @@ Content-Type: application/json
   "modelId": "banana-pro",
   "category": "室内",
   "title": "模板标题",
-  "content": "模板内容"
+  "content": "模板内容",
+  "image": "https://xxx.oss-cn-xxx.aliyuncs.com/..."  // 可选，OSS 预览图 URL
 }
 ```
+
+### 8. 图片上传（OSS）
+
+```
+POST /api/upload/image.php
+Content-Type: multipart/form-data
+
+file: 图片文件（必填）
+prefix: 可选，assets/images/templates | assets/images/references | assets/images/frames
+
+返回: { success: true, data: { url: "https://bucket.oss-cn-xxx.aliyuncs.com/..." } }
+```
+
+### 9. 生成任务参数（含参考图）
+
+```
+POST /api/generation/create.php
+
+{
+  "prompt": "提示词",
+  "model": "banana pro",
+  "type": "image|video",
+  "referenceImageUrls": ["https://xxx.oss-cn-xxx.aliyuncs.com/..."],  // 可选，多张参考图 OSS URL
+  "firstFrameUrl": "https://...",  // 视频首帧 OSS URL
+  "lastFrameUrl": "https://..."    // 视频尾帧 OSS URL
+}
+```
+
+## OSS 配置
+
+详见 [OSS 配置说明](OSS_SETUP.md)
 
 ## 测试
 

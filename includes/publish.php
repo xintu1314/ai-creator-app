@@ -69,6 +69,26 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 <input type="hidden" name="selected_category" id="selected_category" value="">
             </div>
 
+            <!-- Preview Image (上传到 OSS) -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-[#1A1A1A] mb-2">预览图</label>
+                <div class="flex gap-4 items-start">
+                    <div 
+                        id="publish-image-upload" 
+                        class="w-[120px] h-[120px] border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all relative overflow-hidden"
+                        onclick="document.getElementById('publish-image-input').click()"
+                    >
+                        <input type="file" id="publish-image-input" accept="image/*" class="hidden" onchange="handlePublishImageUpload(this)">
+                        <div id="publish-image-preview" class="w-full h-full flex flex-col items-center justify-center">
+                            <i data-lucide="image-plus" class="w-8 h-8 text-[#999999] mb-1"></i>
+                            <span class="text-xs text-[#999999]">点击上传</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 text-xs text-[#666666]">支持 JPG、PNG、GIF、WebP，最大 5MB。将存储至阿里云 OSS。</div>
+                </div>
+                <input type="hidden" name="image" id="publish-image-url" value="">
+            </div>
+
             <!-- Title -->
             <div class="mb-4">
                 <label class="block text-sm font-medium text-[#1A1A1A] mb-2">模板标题</label>
@@ -203,6 +223,32 @@ function selectPublishModel(modelId, modelName) {
     closePublishModelDialog();
 }
 
+async function handlePublishImageUpload(input) {
+    const file = input.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('prefix', 'assets/images/templates');
+    try {
+        const preview = document.getElementById('publish-image-preview');
+        preview.innerHTML = '<span class="text-xs text-[#3B82F6]">上传中...</span>';
+        const res = await fetch('api/upload/image.php', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success && data.data?.url) {
+            document.getElementById('publish-image-url').value = data.data.url;
+            preview.innerHTML = `<img src="${data.data.url}" alt="预览" class="w-full h-full object-cover" />`;
+        } else {
+            preview.innerHTML = '<span class="text-xs text-red-500">' + (data.message || '上传失败') + '</span>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+    } catch (err) {
+        document.getElementById('publish-image-preview').innerHTML = '<span class="text-xs text-red-500">上传失败</span>';
+    }
+}
+
 async function handlePublishSubmit(e) {
     e.preventDefault();
     const form = document.getElementById('publish-form');
@@ -211,6 +257,7 @@ async function handlePublishSubmit(e) {
     const category = document.getElementById('selected_category').value;
     const title = form.querySelector('[name="title"]').value.trim();
     const content = form.querySelector('[name="content"]').value.trim();
+    const image = document.getElementById('publish-image-url').value.trim();
 
     if (!modelId || !category || !title || !content) {
         alert('请填写完整：模型、分类、标题、内容');
@@ -228,7 +275,8 @@ async function handlePublishSubmit(e) {
                 modelName: modelName !== '请选择模型' ? modelName : '',
                 category,
                 title,
-                content
+                content,
+                image: image || undefined
             }),
         });
         const data = await response.json();
@@ -238,6 +286,9 @@ async function handlePublishSubmit(e) {
             document.getElementById('selected_model').value = '';
             document.getElementById('selected-model-display').textContent = '请选择模型';
             document.getElementById('selected-model-display').classList.add('text-[#999999]');
+            document.getElementById('publish-image-url').value = '';
+            document.getElementById('publish-image-preview').innerHTML = '<i data-lucide="image-plus" class="w-8 h-8 text-[#999999] mb-1"></i><span class="text-xs text-[#999999]">点击上传</span>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         } else {
             alert('发布失败：' + (data.message || '未知错误'));
         }

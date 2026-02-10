@@ -36,6 +36,17 @@ $params = [
     'quality' => $input['quality'] ?? '2k',
     'duration' => $input['duration'] ?? 5,
 ];
+// 参考图 OSS URL 列表（图片接口会使用）
+if (!empty($input['referenceImageUrls']) && is_array($input['referenceImageUrls'])) {
+    $params['referenceImageUrls'] = array_values(array_filter($input['referenceImageUrls'], 'is_string'));
+}
+// 视频首帧/尾帧 OSS URL
+if (!empty($input['firstFrameUrl'])) {
+    $params['firstFrameUrl'] = $input['firstFrameUrl'];
+}
+if (!empty($input['lastFrameUrl'])) {
+    $params['lastFrameUrl'] = $input['lastFrameUrl'];
+}
 
 try {
     $pdo = get_db();

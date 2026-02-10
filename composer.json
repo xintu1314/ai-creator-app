@@ -1,0 +1,9 @@
+{
+    "name": "ai-creator/app",
+    "description": "AI创作平台",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "alibabacloud/oss-v2": "^0.4"
+    }
+}

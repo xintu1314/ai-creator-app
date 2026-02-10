@@ -79,15 +79,23 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
                 </div>
             </div>
         <?php else: ?>
-            <div class="flex gap-4 mb-4">
-                <!-- Upload Area -->
-                <div class="w-[100px] h-[100px] border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all duration-200">
-                    <i data-lucide="plus" class="w-6 h-6 text-[#999999] mb-1"></i>
-                    <span class="text-xs text-[#999999]">添加</span>
+            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+                <!-- 多张参考图上传（上传到 OSS） -->
+                <div class="flex gap-2 items-start flex-shrink-0">
+                    <div 
+                        id="ref-images-upload"
+                        class="w-[80px] h-[80px] border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all duration-200"
+                        onclick="document.getElementById('ref-images-input').click()"
+                    >
+                        <input type="file" id="ref-images-input" accept="image/*" multiple class="hidden" onchange="handleRefImagesUpload(this)">
+                        <i data-lucide="plus" class="w-6 h-6 text-[#999999] mb-0.5"></i>
+                        <span class="text-[10px] text-[#999999]">参考图</span>
+                    </div>
+                    <div id="ref-images-preview" class="flex flex-wrap gap-2 max-w-[240px]"></div>
                 </div>
 
                 <!-- Text Input -->
-                <div class="flex-1">
+                <div class="flex-1 min-w-0">
                     <textarea
                         id="prompt-input"
                         placeholder="输入图片生成的提示词，例如：浩瀚的银河中一艘宇宙飞船驶过"

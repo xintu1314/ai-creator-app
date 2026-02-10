@@ -65,24 +65,64 @@ function closeParamsDialog() {
     }
 }
 
-// 处理首帧和尾帧上传
-function handleFrameUpload(input, previewId, frameType) {
+// 处理首帧和尾帧上传 - 上传到 OSS
+async function handleFrameUpload(input, previewId, frameType) {
     const file = input.files[0];
-    if (file && file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const preview = document.getElementById(previewId);
-            if (preview) {
-                preview.innerHTML = `<img src="${e.target.result}" alt="${frameType === 'first-frame' ? '首帧' : '尾帧'}" class="w-full h-full object-cover rounded-lg" />`;
-            }
-            // 存储文件信息
-            if (!window.frameFiles) {
-                window.frameFiles = {};
-            }
-            window.frameFiles[frameType] = file;
-        };
-        reader.readAsDataURL(file);
+    if (!file || !file.type.startsWith('image/')) return;
+    const preview = document.getElementById(previewId);
+    if (preview) preview.innerHTML = '<span class="text-xs text-[#3B82F6]">上传中...</span>';
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('prefix', 'assets/images/frames');
+    try {
+        const res = await fetch('api/upload/image.php', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success && data.data?.url) {
+            if (!window.frameUrls) window.frameUrls = {};
+            window.frameUrls[frameType] = data.data.url;
+            if (preview) preview.innerHTML = `<img src="${data.data.url}" alt="${frameType}" class="w-full h-full object-cover rounded-lg" />`;
+        } else {
+            if (preview) preview.innerHTML = '<span class="text-xs text-red-500">' + (data.message || '上传失败') + '</span>';
+        }
+    } catch (err) {
+        if (preview) preview.innerHTML = '<span class="text-xs text-red-500">上传失败</span>';
     }
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// 处理多张参考图上传 - 上传到 OSS
+async function handleRefImagesUpload(input) {
+    const files = Array.from(input.files || []);
+    if (files.length === 0) return;
+    if (!window.referenceImageUrls) window.referenceImageUrls = [];
+    const preview = document.getElementById('ref-images-preview');
+    for (const file of files) {
+        if (!file.type.startsWith('image/')) continue;
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('prefix', 'assets/images/references');
+        try {
+            const res = await fetch('api/upload/image.php', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success && data.data?.url) {
+                window.referenceImageUrls.push(data.data.url);
+                const div = document.createElement('div');
+                div.className = 'relative w-[60px] h-[60px] rounded-lg overflow-hidden flex-shrink-0 group';
+                div.dataset.url = data.data.url;
+                div.innerHTML = `<img src="${data.data.url}" alt="参考" class="w-full h-full object-cover" /><button type="button" onclick="removeRefImage(this)" class="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white text-xs rounded-bl flex items-center justify-center opacity-0 group-hover:opacity-100">×</button>`;
+                if (preview) preview.appendChild(div);
+            }
+        } catch (e) { /* skip */ }
+    }
+    input.value = '';
+}
+
+function removeRefImage(btn) {
+    const div = btn.closest('.relative');
+    if (!div || !div.dataset.url) return;
+    const url = div.dataset.url;
+    if (window.referenceImageUrls) window.referenceImageUrls = window.referenceImageUrls.filter(u => u !== url);
+    div.remove();
 }
 
 // 设置图片张数
@@ -214,10 +254,19 @@ async function handleGenerate() {
         quality: settings.quality || '2k',
     };
     
+    // 参考图 URL 列表（OSS 链接，供图片接口使用）
+    if (window.referenceImageUrls && window.referenceImageUrls.length > 0) {
+        payload.referenceImageUrls = window.referenceImageUrls;
+    }
+    
     if (type === 'video') {
         const durationEl = document.getElementById('video-duration');
         payload.duration = durationEl ? parseInt(durationEl.textContent) || 5 : 5;
         payload.quality = window.videoQuality || 'standard';
+        if (window.frameUrls) {
+            if (window.frameUrls['first-frame']) payload.firstFrameUrl = window.frameUrls['first-frame'];
+            if (window.frameUrls['last-frame']) payload.lastFrameUrl = window.frameUrls['last-frame'];
+        }
     }
 
     try {
