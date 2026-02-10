@@ -19,7 +19,7 @@ $models = $creationType === 'image' ? $imageModels : $videoModels;
                     >
                         <div class="flex items-start gap-3">
                             <!-- Model Icon -->
-                            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br <?= $model['icon'] === 'banana' ? 'from-yellow-400 to-yellow-600' : ($model['icon'] === 'sora' ? 'from-purple-500 to-pink-500' : 'from-blue-400 to-blue-600') ?>">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br <?= $model['icon'] === 'banana' ? 'from-yellow-400 to-yellow-600' : ($model['icon'] === 'doubao' ? 'from-emerald-500 to-teal-600' : ($model['icon'] === 'sora' ? 'from-purple-500 to-pink-500' : 'from-blue-400 to-blue-600')) ?>">
                                 <?php
                                 $iconHtml = '';
                                 switch($model['icon']) {
@@ -58,6 +58,9 @@ $models = $creationType === 'image' ? $imageModels : $videoModels;
                                         break;
                                     case 'banana':
                                         $iconHtml = '<div class="w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg"></div>';
+                                        break;
+                                    case 'doubao':
+                                        $iconHtml = '<div class="w-5 h-5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg"></div>';
                                         break;
                                     case 'sora':
                                         $iconHtml = '<div class="w-5 h-5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg"></div>';
@@ -106,18 +109,20 @@ $models = $creationType === 'image' ? $imageModels : $videoModels;
             <!-- Quality Selection -->
             <div>
                 <label class="text-sm text-[#666666] mb-2 block">图像质量</label>
-                <div class="flex p-1 bg-[#F5F5F5] rounded-lg">
+                <div class="flex gap-2">
                     <button
                         id="quality-2k"
                         onclick="setQuality('2k')"
-                        class="flex-1 py-2 text-sm rounded-md transition-all duration-200 bg-white text-[#1A1A1A] shadow-sm"
+                        class="flex-1 py-2 text-sm rounded-lg border transition-all duration-200 quality-btn border-[#3B82F6] bg-[#F0F7FF] text-[#3B82F6]"
+                        data-quality="2k"
                     >
                         高清 2K
                     </button>
                     <button
                         id="quality-4k"
                         onclick="setQuality('4k')"
-                        class="flex-1 py-2 text-sm rounded-md transition-all duration-200 text-[#666666] hover:text-[#1A1A1A]"
+                        class="flex-1 py-2 text-sm rounded-lg border transition-all duration-200 quality-btn border-[#E5E5E5] text-[#666666] hover:border-[#3B82F6]"
+                        data-quality="4k"
                     >
                         超清 4K
                     </button>
@@ -191,7 +196,7 @@ $models = $creationType === 'image' ? $imageModels : $videoModels;
                         <button
                             onclick="setCount(<?= $i ?>)"
                             id="count-<?= $i ?>"
-                            class="py-2 text-sm rounded-lg border transition-all duration-200 border-[#E5E5E5] hover:border-[#3B82F6] text-[#666666] count-btn"
+                            class="py-2 text-sm rounded-lg border transition-all duration-200 count-btn <?= $i === 1 ? 'border-[#3B82F6] bg-[#F0F7FF] text-[#3B82F6]' : 'border-[#E5E5E5] text-[#666666] hover:border-[#3B82F6]' ?>"
                             data-count="<?= $i ?>"
                         >
                             <?= $i ?>张

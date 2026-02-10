@@ -100,6 +100,10 @@ POST /api/generation/create.php
 
 详见 [OSS 配置说明](OSS_SETUP.md)
 
+## AI 配置
+
+详见 [AI 接口配置说明](AI_SETUP.md)
+
 ## 测试
 
 使用 PHP 内置服务器：

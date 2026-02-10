@@ -191,7 +191,7 @@ function openPublishModelDialog() {
             class="text-left p-4 rounded-xl border border-[#E5E5E5] bg-[#F9FAFB] hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all duration-200"
         >
             <div class="flex items-start gap-3">
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${model.icon === 'banana' ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' : (model.icon === 'sora' ? 'bg-gradient-to-br from-purple-500 to-pink-500' : 'bg-gradient-to-br from-blue-400 to-blue-600')}">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${model.icon === 'banana' ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' : (model.icon === 'doubao' ? 'bg-gradient-to-br from-emerald-500 to-teal-600' : (model.icon === 'sora' ? 'bg-gradient-to-br from-purple-500 to-pink-500' : 'bg-gradient-to-br from-blue-400 to-blue-600'))}">
                     <div class="w-5 h-5 bg-white/90 rounded-lg"></div>
                 </div>
                 <div class="flex-1 min-w-0">

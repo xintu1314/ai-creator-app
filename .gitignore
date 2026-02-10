@@ -34,3 +34,6 @@ uploads/*
 
 # OSS 本地配置（含密钥时勿提交）
 api/config/oss.local.php
+
+# AI 本地配置（含密钥时勿提交）
+api/config/ai.local.php

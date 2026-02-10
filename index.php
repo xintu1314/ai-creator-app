@@ -19,6 +19,7 @@ $templates = $creationType === 'image' ? $imageTemplates : $videoTemplates;
 $imageModels = get_models('image');
 $videoModels = get_models('video');
 $categories = get_categories();
+$currentModel = ($creationType === 'video' ? $videoModels : $imageModels)[0] ?? null;
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -40,21 +41,29 @@ $categories = get_categories();
         <div class="flex-1 flex flex-col ml-16">
             <?php include 'includes/header.php'; ?>
             
-            <main class="flex-1 mt-14 overflow-auto">
+            <main class="flex-1 mt-14 overflow-hidden flex flex-col">
                 <?php if ($activeTab === 'inspiration'): ?>
-                    <?php include 'includes/inspiration_library.php'; ?>
+                    <div class="flex-1 overflow-auto">
+                        <?php include 'includes/inspiration_library.php'; ?>
+                    </div>
                 <?php elseif ($activeTab === 'create'): ?>
                     <?php include 'includes/creation_area.php'; ?>
                     
-                    <div class="max-w-[900px] mx-auto px-6 pb-8">
+                    <div id="template-cards-section" class="max-w-[900px] mx-auto px-6 pb-8 overflow-auto flex-shrink-0">
                         <?php include 'includes/template_cards.php'; ?>
                     </div>
                 <?php elseif ($activeTab === 'assets'): ?>
-                    <?php include 'includes/assets.php'; ?>
+                    <div class="flex-1 overflow-auto">
+                        <?php include 'includes/assets.php'; ?>
+                    </div>
                 <?php elseif ($activeTab === 'publish'): ?>
-                    <?php include 'includes/publish.php'; ?>
+                    <div class="flex-1 overflow-auto">
+                        <?php include 'includes/publish.php'; ?>
+                    </div>
                 <?php elseif ($activeTab === 'tutorial'): ?>
-                    <?php include 'includes/tutorial.php'; ?>
+                    <div class="flex-1 overflow-auto">
+                        <?php include 'includes/tutorial.php'; ?>
+                    </div>
                 <?php endif; ?>
             </main>
         </div>
