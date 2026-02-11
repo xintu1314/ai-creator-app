@@ -14,7 +14,7 @@ function get_templates($type = 'image') {
     }
 
     $stmt = $pdo->prepare("
-        SELECT id, title, image, model_name, model_id, content_type, category
+        SELECT id, title, image, model_name, model_id, content_type, category, content
         FROM publish_templates
         WHERE content_type = :type
         ORDER BY created_at DESC
@@ -29,8 +29,10 @@ function get_templates($type = 'image') {
             'title' => $row['title'],
             'image' => $row['image'] ?: TEMPLATE_PLACEHOLDER_IMAGE,
             'model' => !empty($row['model_name']) ? $row['model_name'] : ($row['model_id'] ?? ''),
+            'modelId' => $row['model_id'] ?? '',
             'type' => $row['content_type'],
             'category' => $row['category'] ?? '',
+            'prompt' => trim((string)($row['content'] ?? '')),
         ];
     }
     return $items;

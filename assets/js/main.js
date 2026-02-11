@@ -300,6 +300,7 @@ function selectModel(modelId, modelName) {
     if (window.currentSettings) {
         window.currentSettings.selectedModel = modelId;
     }
+    if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
     closeModelDialog();
 }
 
@@ -396,6 +397,7 @@ function setCount(count) {
     window.currentSettings.count = count;
     const countElement = document.getElementById('image-count');
     if (countElement) countElement.textContent = count + '张';
+    if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
     document.querySelectorAll('.count-btn').forEach(btn => {
         const btnCount = parseInt(btn.getAttribute('data-count'));
         const baseClass = 'py-2 text-sm rounded-lg border transition-all duration-200 count-btn';
@@ -448,6 +450,7 @@ function setMode(mode) {
 function setQuality(quality) {
     if (window.currentSettings) window.currentSettings.quality = quality;
     updateParamsDialogUI();
+    if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
 }
 
 function setAspectRatio(ratio, width, height) {
@@ -459,8 +462,23 @@ function setAspectRatio(ratio, width, height) {
 }
 
 function useTemplate(template) {
-    console.log('Using template:', template);
-    alert('模板功能：' + template.title);
+    const promptInput = document.getElementById('prompt-input');
+    if (promptInput) {
+        promptInput.value = template.prompt || template.title || '';
+        promptInput.focus();
+    }
+    if (template.modelId && window.currentCreationType === 'image' && window.modelsData) {
+        const modelId = template.modelId.toLowerCase().replace(/\s+/g, '-');
+        const model = window.modelsData.find(function(m) {
+            return (m.id || '').toLowerCase().replace(/\s+/g, '-') === modelId ||
+                   (m.id || '').toLowerCase() === modelId.replace(/-/g, '_');
+        });
+        if (model) {
+            document.getElementById('selected-model').textContent = model.name;
+            if (window.currentSettings) window.currentSettings.selectedModel = model.id || modelId;
+            if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
+        }
+    }
 }
 
 // ============================
@@ -509,6 +527,22 @@ function setGenerateBtnLoading(loading) {
         genBtn.classList.remove('opacity-70', 'cursor-not-allowed');
         genBtn.innerHTML = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> 生成';
     }
+}
+
+function updateGeneratePointsDisplay() {
+    if (window.currentCreationType !== 'image') return;
+    const badge = document.getElementById('generate-points-badge');
+    const valueEl = document.getElementById('generate-points-value');
+    if (!badge || !valueEl) return;
+    const pricing = window.pointsPricingImage || {};
+    const modelId = (window.currentSettings?.selectedModel || document.getElementById('selected-model')?.textContent || 'banana').toLowerCase().replace(/\s+/g, '_');
+    const modelKey = modelId === 'banana_pro' || modelId === 'banana-pro' ? 'banana_pro' : 'banana';
+    const quality = (window.currentSettings?.quality || '2k').toLowerCase();
+    const qualityKey = quality === '4k' ? '4k' : '2k';
+    const count = Math.max(1, Math.min(4, Number(window.currentSettings?.count || 1)));
+    const perImage = pricing[modelKey]?.[qualityKey] ?? 5;
+    const total = perImage * count;
+    valueEl.textContent = total;
 }
 
 function isGeneratingNow() {
@@ -764,6 +798,7 @@ function showGenerationResult(imageUrl, prompt, meta, slotIndex = 0) {
     else container.appendChild(newMsg);
 
     completeOneGeneration();
+    refreshPointsSummary();
 
     setTimeout(scrollToLatestGeneration, 100);
     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -788,6 +823,7 @@ function showGenerationError(errorMsg, prompt, meta, slotIndex = 0) {
     else container.appendChild(newMsg);
 
     completeOneGeneration();
+    refreshPointsSummary();
 
     setTimeout(scrollToLatestGeneration, 100);
     if (typeof lucide !== 'undefined') lucide.createIcons();
@@ -1085,6 +1121,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (membershipDialog) membershipDialog.style.display = 'none';
 
     refreshPointsSummary();
+    if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
 
     // Ctrl+Enter / Cmd+Enter 快捷键生成
     const promptInput = document.getElementById('prompt-input');

@@ -44,7 +44,7 @@
                         class="group cursor-pointer template-item"
                         data-template-id="<?= $template['id'] ?>"
                         data-category="<?= htmlspecialchars($template['category'] ?? '') ?>"
-                        onclick="selectTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>)"
+                        onclick="useTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>); closeTemplateSheet();"
                     >
                         <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-lg transition-all duration-300 aspect-[3/4]">
                             <!-- Image -->
@@ -72,71 +72,14 @@
                 <?php endforeach; ?>
             </div>
         </div>
-
-        <!-- Bottom Action Bar -->
-        <div id="template-action-bar" class="hidden border-t border-[#E5E5E5] bg-white p-4 flex-shrink-0">
-            <div class="max-w-[1200px] mx-auto flex items-center gap-4">
-                <!-- Preview Image -->
-                <div class="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                    <img
-                        id="selected-template-image"
-                        src=""
-                        alt=""
-                        class="w-full h-full object-cover"
-                    />
-                </div>
-
-                <!-- Input Area -->
-                <div class="flex-1 flex items-center gap-3">
-                    <div class="w-[80px] h-[80px] border-2 border-dashed border-[#E5E5E5] rounded-lg flex items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all">
-                        <span class="text-2xl text-[#999999]">+</span>
-                    </div>
-                    <input
-                        type="text"
-                        id="template-prompt-input"
-                        placeholder="试试描述一段简短的故事情节，最关键的是主体、环境、时间、风格"
-                        class="flex-1 h-[80px] px-4 text-sm text-[#1A1A1A] placeholder:text-[#999999] border border-[#E5E5E5] rounded-lg focus:outline-none focus:border-[#3B82F6] transition-colors"
-                    />
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="flex items-center gap-3">
-                    <button
-                        onclick="makeSimilar()"
-                        class="h-[80px] px-6 text-sm font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors whitespace-nowrap"
-                    >
-                        做同款
-                    </button>
-                    <button
-                        onclick="generateFromTemplate()"
-                        class="h-[80px] px-6 text-sm font-medium bg-white border border-[#E5E5E5] hover:bg-[#F5F5F5] text-[#1A1A1A] rounded-lg transition-colors whitespace-nowrap"
-                    >
-                        生成
-                    </button>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
 <script>
-let selectedTemplateData = null;
 let currentCategory = '全部';
 
 function setTemplateCategory(category) {
     currentCategory = category;
-    
-    // 重置选中的模板
-    selectedTemplateData = null;
-    const actionBar = document.getElementById('template-action-bar');
-    if (actionBar) {
-        actionBar.classList.add('hidden');
-    }
-    
-    // 清除所有选中状态
-    document.querySelectorAll('.template-item').forEach(item => {
-        item.classList.remove('ring-2', 'ring-[#3B82F6]', 'rounded-xl', 'p-1');
-    });
     
     // 更新按钮样式
     document.querySelectorAll('.template-category-btn').forEach(btn => {
@@ -160,43 +103,6 @@ function setTemplateCategory(category) {
             item.style.display = 'none';
         }
     });
-}
-
-function selectTemplate(template) {
-    selectedTemplateData = template;
-    
-    // 更新选中状态
-    document.querySelectorAll('.template-item').forEach(item => {
-        const itemId = item.getAttribute('data-template-id');
-        if (itemId === template.id) {
-            item.classList.add('ring-2', 'ring-[#3B82F6]', 'rounded-xl', 'p-1');
-        } else {
-            item.classList.remove('ring-2', 'ring-[#3B82F6]', 'rounded-xl', 'p-1');
-        }
-    });
-    
-    // 显示底部操作栏
-    const actionBar = document.getElementById('template-action-bar');
-    const previewImage = document.getElementById('selected-template-image');
-    if (actionBar && previewImage) {
-        actionBar.classList.remove('hidden');
-        previewImage.src = template.image;
-        previewImage.alt = template.title;
-    }
-}
-
-function makeSimilar() {
-    if (selectedTemplateData) {
-        useTemplate(selectedTemplateData);
-        closeTemplateSheet();
-    }
-}
-
-function generateFromTemplate() {
-    if (selectedTemplateData) {
-        useTemplate(selectedTemplateData);
-        closeTemplateSheet();
-    }
 }
 
 // 初始化类别按钮样式

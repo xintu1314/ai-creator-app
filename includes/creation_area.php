@@ -157,17 +157,25 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
                     </button>
                 </div>
 
-                <!-- Generate Button -->
-                <button 
-                    id="generate-btn"
-                    onclick="handleGenerate()"
-                    class="h-9 px-8 text-sm font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-all duration-200 hover:scale-[1.02] flex items-center gap-2"
-                >
-                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                    </svg>
-                    生成
-                </button>
+                <!-- Generate Button + Points Badge -->
+                <div class="flex items-center gap-2">
+                    <button 
+                        id="generate-btn"
+                        onclick="handleGenerate()"
+                        class="h-9 px-8 text-sm font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-all duration-200 hover:scale-[1.02] flex items-center gap-2"
+                    >
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        生成
+                    </button>
+                    <?php if ($creationType === 'image'): ?>
+                    <span id="generate-points-badge" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#64748B] bg-[#F1F5F9] rounded-lg border border-[#E2E8F0]">
+                        <svg class="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        <span id="generate-points-value">--</span>
+                    </span>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
 
@@ -184,4 +192,5 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
 // 存储模型数据供JS使用
 window.modelsData = <?= json_encode($models, JSON_UNESCAPED_UNICODE) ?>;
 window.currentCreationType = '<?= $creationType ?>';
+document.addEventListener('DOMContentLoaded', function() { if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay(); });
 </script>
