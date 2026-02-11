@@ -553,6 +553,20 @@ function setGeneratingNow(flag) {
     window.__genInFlight = Boolean(flag);
 }
 
+function isVideoMeta(meta) {
+    return Boolean(meta && meta.type === 'video');
+}
+
+function getSlotBadgeText(meta, slotIndex = 0, totalSlots = 1) {
+    if (isVideoMeta(meta)) return '视频任务';
+    return `第${slotIndex + 1}/${totalSlots}张`;
+}
+
+function getCountBadgeText(meta) {
+    if (isVideoMeta(meta)) return '1条';
+    return String((meta && meta.count) || 1) + '张';
+}
+
 function initGenerationBatch(total) {
     window.__activePollGroupId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     window.__batchState = {
@@ -599,11 +613,11 @@ function createProcessingMessage(prompt, meta, slotIndex = 0, totalSlots = 1) {
         <div class="px-5 pt-4 pb-3">
             <div class="text-sm font-medium text-[#1A1A1A] mb-2 truncate">${escapeHtml(prompt || '生成中...')}</div>
             <div class="flex flex-wrap gap-2 mb-4">
-                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#EEF2FF] text-[#4F46E5]">第${slotIndex + 1}/${totalSlots}张</span>
+                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#EEF2FF] text-[#4F46E5]">${escapeHtml(getSlotBadgeText(meta, slotIndex, totalSlots))}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.model) || '')}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.quality) || '')}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.aspectRatio) || '')}</span>
-                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml(String((meta && meta.count) || 1) + '张')}</span>
+                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml(getCountBadgeText(meta))}</span>
             </div>
             <div class="relative w-[240px] h-[320px] rounded-2xl overflow-hidden">
                 <!-- 渐变动画背景 -->
@@ -631,24 +645,27 @@ function createResultMessage(prompt, meta, imageUrl, slotIndex = 0, totalSlots =
     msg.dataset.prompt = prompt || '';
     msg.dataset.meta = JSON.stringify(meta || {});
 
-    const imgHtml = imageUrl
-        ? `<img src="${escapeHtml(imageUrl)}" alt="生成结果" class="w-full rounded-2xl shadow-sm block max-h-[500px] object-contain bg-[#FAFAFA]" />`
+    const isVideo = (meta && meta.type === 'video') || /\.(mp4|webm|mov)(\?|$)/i.test(imageUrl || '');
+    const mediaHtml = imageUrl
+        ? (isVideo
+            ? `<video src="${escapeHtml(imageUrl)}" controls class="w-full rounded-2xl shadow-sm block max-h-[500px] object-contain bg-[#FAFAFA]"></video>`
+            : `<img src="${escapeHtml(imageUrl)}" alt="生成结果" class="w-full rounded-2xl shadow-sm block max-h-[500px] object-contain bg-[#FAFAFA]" />`)
         : '<div class="h-[200px] flex items-center justify-center text-[#999] rounded-2xl bg-[#F5F5F5]">暂无预览</div>';
 
     msg.innerHTML = `
         <div class="px-5 pt-4 pb-2">
             <div class="text-sm font-medium text-[#1A1A1A] mb-2">${escapeHtml(prompt || '')}</div>
             <div class="flex flex-wrap gap-2 mb-3">
-                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#EEF2FF] text-[#4F46E5]">第${slotIndex + 1}/${totalSlots}张</span>
+                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#EEF2FF] text-[#4F46E5]">${escapeHtml(getSlotBadgeText(meta, slotIndex, totalSlots))}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.model) || '')}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.quality) || '')}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.aspectRatio) || '')}</span>
-                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml(String((meta && meta.count) || 1) + '张')}</span>
+                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml(getCountBadgeText(meta))}</span>
             </div>
         </div>
         <div class="px-5 pb-4">
             <div class="relative">
-                ${imgHtml}
+                ${mediaHtml}
                 ${imageUrl ? '<span class="absolute top-2 left-2 px-2 py-0.5 text-xs bg-black/50 text-white rounded-full backdrop-blur-sm">AI 生成</span>' : ''}
             </div>
             <div class="flex items-center gap-5 mt-3 pt-3 border-t border-[#F0F0F0] text-sm text-[#888]">
@@ -683,11 +700,11 @@ function createErrorMessage(prompt, meta, errorMsg, slotIndex = 0, totalSlots = 
         <div class="px-5 pt-4 pb-2">
             <div class="text-sm font-medium text-[#1A1A1A] mb-2">${escapeHtml(prompt || '')}</div>
             <div class="flex flex-wrap gap-2 mb-3">
-                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#EEF2FF] text-[#4F46E5]">第${slotIndex + 1}/${totalSlots}张</span>
+                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#EEF2FF] text-[#4F46E5]">${escapeHtml(getSlotBadgeText(meta, slotIndex, totalSlots))}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.model) || '')}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.quality) || '')}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.aspectRatio) || '')}</span>
-                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml(String((meta && meta.count) || 1) + '张')}</span>
+                <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml(getCountBadgeText(meta))}</span>
             </div>
         </div>
         <div class="px-5 pb-4">
@@ -902,10 +919,13 @@ async function handleGenerate() {
         : (document.getElementById('aspect-ratio')?.textContent || '3:4');
 
     const meta = {
+        type,
         model: document.getElementById('selected-model')?.textContent || modelId,
-        quality: (settings.quality || '2k').toUpperCase(),
+        quality: type === 'video'
+            ? ((settings.videoQuality || 'standard') === 'high' ? '高品质' : '标准')
+            : (settings.quality || '2k').toUpperCase(),
         aspectRatio: aspectRatio,
-        count: Number(settings.count || 1),
+        count: type === 'video' ? 1 : Number(settings.count || 1),
     };
 
     const payload = {
@@ -925,7 +945,7 @@ async function handleGenerate() {
     if (type === 'video') {
         const durationEl = document.getElementById('video-duration');
         payload.duration = durationEl ? parseInt(durationEl.textContent) || 5 : 5;
-        payload.quality = window.videoQuality || 'standard';
+        payload.quality = settings.videoQuality || 'standard';
         if (window.frameUrls) {
             if (window.frameUrls['first-frame']) payload.firstFrameUrl = window.frameUrls['first-frame'];
             if (window.frameUrls['last-frame']) payload.lastFrameUrl = window.frameUrls['last-frame'];
@@ -977,9 +997,10 @@ async function handleGenerate() {
                 taskIds.forEach((id, idx) => {
                     pollTaskStatus(id, type, prompt, meta, idx, slotCount);
                 });
-            } else if (type === 'video') {
-                // 视频接口暂未接入
-                showGenerationError(data.data?.message || '视频生成接口暂未接入', prompt, meta, 0);
+            } else if (type === 'video' && taskIds.length > 0 && status === 'processing') {
+                initGenerationBatch(1);
+                updateStatusBar('0/1 生成中...');
+                pollTaskStatus(taskIds[0], type, prompt, meta, 0, 1);
             } else {
                 showGenerationError('不支持的任务类型或模型', prompt, meta, 0);
             }
@@ -1054,7 +1075,10 @@ async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCo
             // 0=排队中 1=生成中：持续轮询，进度卡在 99%
             loopCount += 1;
             progress = Math.min(99, progress + (loopCount < 40 ? 2 : 1));
-            updateGenerationProgress(Math.round(progress), `第${slotIndex + 1}张 ${Math.round(progress)}% 生成中...`, slotIndex);
+            const label = isVideoMeta(meta)
+                ? `${Math.round(progress)}% 生成中...`
+                : `第${slotIndex + 1}张 ${Math.round(progress)}% 生成中...`;
+            updateGenerationProgress(Math.round(progress), label, slotIndex);
             await new Promise(r => setTimeout(r, interval));
         } catch (e) {
             console.error('[轮询异常]', e);

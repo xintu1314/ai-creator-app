@@ -1,7 +1,7 @@
 <?php
 /**
  * POST /api/generation/create.php
- * 创建生成任务（接入 banana、banana pro 图片接口，豆包视频待接入）
+ * 创建生成任务（接入 banana、banana pro 图片接口、豆包视频）
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
@@ -199,13 +199,61 @@ try {
             'pointsPerImage' => $pointsPerTask,
             'wallet' => $wallet,
         ]);
-    } elseif ($type === 'video' && in_array($model, ['豆包视频', 'doubao-video'])) {
-        // 视频：豆包视频（待接入）
-        $params['external_task_id'] = null;
+    } elseif ($type === 'video' && in_array($model, ['豆包视频', 'doubao-video', 'doubao-seedance-1-5-pro-251215'])) {
+        // 视频：豆包视频（火山方舟）
+        require_once __DIR__ . '/../common/doubao.php';
+
+        $duration = max(1, min(30, (int)($params['duration'] ?? 5)));
+        // 豆包视频默认有声，统一按有声定价
+        $pointsPerTask = points_calculate_video_points('doubao_video', $duration);
+
+        $consumeRet = points_consume(
+            $userId,
+            $pointsPerTask,
+            'generate_consume',
+            '视频生成扣费',
+            [
+                'taskId' => $taskId,
+                'model' => 'doubao_video',
+                'duration' => $duration,
+            ]
+        );
+        if (!$consumeRet['success']) {
+            json_error($consumeRet['message'] ?? '积分不足');
+            exit;
+        }
+
+        $submitRet = doubao_submit_video($prompt, [
+            'duration' => $duration,
+            'aspect_ratio' => $mapRatio((string)($params['aspectRatio'] ?? '16:9')),
+            'first_frame_url' => (string)($params['firstFrameUrl'] ?? ''),
+            'camera_fixed' => (bool)($input['cameraFixed'] ?? false),
+            'watermark' => array_key_exists('watermark', $input) ? (bool)$input['watermark'] : true,
+        ]);
+
+        if (!$submitRet['success']) {
+            points_refund_to_paid(
+                $userId,
+                $pointsPerTask,
+                'generate_refund_submit_fail',
+                '视频任务提交失败退回积分',
+                [
+                    'taskId' => $taskId,
+                    'model' => 'doubao_video',
+                ]
+            );
+            json_error($submitRet['message'] ?? '视频任务提交失败');
+            exit;
+        }
+
+        $params['external_task_id'] = (string)$submitRet['task_id'];
+        $params['points_charged'] = $pointsPerTask;
+        $params['points_charged_paid'] = (int)($consumeRet['paidUsed'] ?? $pointsPerTask);
+        $params['points_charged_bonus'] = (int)($consumeRet['bonusUsed'] ?? 0);
 
         $stmt = $pdo->prepare("
             INSERT INTO tasks (id, user_id, type, status, params_json)
-            VALUES (:id, :user_id, :type, 'pending', :params)
+            VALUES (:id, :user_id, :type, 'processing', :params)
         ");
         $stmt->execute([
             'id' => $taskId,
@@ -214,10 +262,13 @@ try {
             'params' => json_encode($params, JSON_UNESCAPED_UNICODE),
         ]);
 
+        $wallet = points_get_wallet_summary($userId);
         json_success([
             'taskId' => $taskId,
-            'status' => 'pending',
-            'message' => '豆包视频接口待接入，任务已创建',
+            'status' => 'processing',
+            'message' => '视频任务已提交，请在资产中心查看生成结果',
+            'pointsPerVideo' => $pointsPerTask,
+            'wallet' => $wallet,
         ]);
     } else {
         json_error('不支持的模型：' . $model);

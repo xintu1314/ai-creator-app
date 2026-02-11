@@ -1,7 +1,7 @@
 <?php
 /**
  * GET /api/generation/status.php?taskId=xxx
- * 查询生成任务状态（轮询无形科技 async/detail 接口）
+ * 查询生成任务状态（轮询无形科技 / 豆包视频）
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
@@ -190,6 +190,69 @@ $ensureAssetExists = function (array $taskRow, array $taskParams): void {
                 'status' => 'processing',
             ]);
         }
+    } elseif ($row['type'] === 'video' && $externalId) {
+        require_once __DIR__ . '/../common/doubao.php';
+        $result = doubao_query_video((string)$externalId);
+        if (!$result['success']) {
+            json_error($result['message'] ?? '查询失败');
+            exit;
+        }
+
+        if ($result['status'] === 'completed') {
+            $videoUrl = (string)($result['result_url'] ?? '');
+            $stmt = $pdo->prepare("
+                UPDATE tasks
+                SET status = 'completed', result_url = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status <> 'completed'
+            ");
+            $stmt->execute([$videoUrl, $taskId]);
+            $justCompleted = $stmt->rowCount() > 0;
+            if ($justCompleted && $videoUrl !== '') {
+                $row['result_url'] = $videoUrl;
+                $ensureAssetExists($row, $params);
+            }
+            json_success([
+                'taskId' => $taskId,
+                'status' => 'completed',
+                'resultUrl' => $videoUrl,
+            ]);
+            exit;
+        }
+
+        if ($result['status'] === 'failed') {
+            $errMsg = (string)($result['fail_reason'] ?? '视频生成失败');
+            $stmt = $pdo->prepare("UPDATE tasks SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> 'failed'");
+            $stmt->execute([$errMsg, $taskId]);
+            $justFailed = $stmt->rowCount() > 0;
+
+            if ($justFailed) {
+                $refundPoints = (int)($params['points_charged'] ?? 0);
+                if ($refundPoints > 0) {
+                    points_refund_to_paid(
+                        (int)$row['user_id'],
+                        $refundPoints,
+                        'generate_refund_failed',
+                        '视频生成失败退回积分',
+                        [
+                            'taskId' => $taskId,
+                            'model' => $params['model'] ?? '',
+                            'duration' => $params['duration'] ?? 5,
+                        ]
+                    );
+                }
+            }
+            json_success([
+                'taskId' => $taskId,
+                'status' => 'failed',
+                'errorMessage' => $errMsg,
+            ]);
+            exit;
+        }
+
+        json_success([
+            'taskId' => $taskId,
+            'status' => 'processing',
+        ]);
     } else {
         json_success([
             'taskId' => $taskId,

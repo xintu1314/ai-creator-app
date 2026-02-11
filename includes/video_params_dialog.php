@@ -10,7 +10,7 @@ $defaultVideoQuality = 'standard';
 ?>
 <!-- Video Params Dialog -->
 <div id="video-params-dialog" class="hidden fixed inset-0 z-50 dialog-overlay" onclick="closeVideoParamsDialog()" style="display: none;">
-    <div class="dialog-content max-w-[400px] p-0 gap-0" onclick="event.stopPropagation()">
+    <div class="dialog-content w-[92vw] max-w-[480px] p-0 gap-0" onclick="event.stopPropagation()">
         <div class="px-5 py-4 border-b border-[#E5E5E5]">
             <h2 class="text-base font-medium text-[#1A1A1A]">视频设置</h2>
         </div>
@@ -23,14 +23,14 @@ $defaultVideoQuality = 'standard';
                     <button
                         id="quality-standard"
                         onclick="setVideoQuality('standard')"
-                        class="flex-1 py-2 text-sm rounded-md transition-all duration-200 bg-white text-[#1A1A1A] shadow-sm"
+                        class="flex-1 py-2 text-sm rounded-md transition-all duration-200 bg-white text-[#1A1A1A] shadow-sm whitespace-nowrap"
                     >
                         标准模式
                     </button>
                     <button
                         id="quality-high"
                         onclick="setVideoQuality('high')"
-                        class="flex-1 py-2 text-sm rounded-md transition-all duration-200 text-[#666666] hover:text-[#1A1A1A]"
+                        class="flex-1 py-2 text-sm rounded-md transition-all duration-200 text-[#666666] hover:text-[#1A1A1A] whitespace-nowrap"
                     >
                         高品质模式
                     </button>

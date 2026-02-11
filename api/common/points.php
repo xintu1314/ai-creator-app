@@ -23,6 +23,14 @@ function points_get_pricing_config(): array {
             'banana' => ['2k' => 5, '4k' => 9],
             'banana_pro' => ['2k' => 10, '4k' => 18],
         ],
+        'video_cost_points' => [
+            // 豆包视频（默认有声）：16元/百万tokens，100%利润率
+            // 假设5秒≈10万tokens → 成本1.6元 → 收费3.2元 ≈ 53分；取55分便于计算
+            // 10秒按2倍；1元≈16.67分
+            'doubao_video' => [
+                'points_per_5s' => 55,
+            ],
+        ],
         'profit_target' => [
             'target' => '~100%',
             'note' => 'banana_pro 2K固定10分，按成本0.3测算约100%利润；4K比2K多80%',
@@ -54,6 +62,17 @@ function points_calculate_image_points(string $model, string $quality): int {
         $modelKey = 'banana';
     }
     return (int)$cfg['image_cost_points'][$modelKey][$qualityKey];
+}
+
+function points_calculate_video_points(string $model, int $duration = 5): int {
+    $cfg = points_get_pricing_config();
+    $modelKey = 'doubao_video';
+
+    $duration = max(1, min(30, $duration));
+    $base = (int)($cfg['video_cost_points'][$modelKey]['points_per_5s'] ?? 55);
+
+    // 5 秒为基准，按时长线性放大，最小 1 分
+    return max(1, (int)ceil($base * ($duration / 5)));
 }
 
 function points_current_cycle_key(?DateTimeImmutable $now = null): string {
