@@ -1,5 +1,6 @@
 <?php
 // 视频参数设置对话框
+$defaultAspectRatio = $defaultAspectRatio ?? '16:9';
 $videoAspectRatios = [
     ['value' => '16:9', 'label' => '16:9'],
     ['value' => '1:1', 'label' => '1:1'],

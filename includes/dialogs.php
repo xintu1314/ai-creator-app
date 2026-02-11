@@ -1,6 +1,8 @@
 <?php
 // 模型选择对话框
 $models = $creationType === 'image' ? $imageModels : $videoModels;
+$defaultAspectRatio = $defaultAspectRatio ?? (($creationType ?? 'image') === 'video' ? '16:9' : '3:4');
+$currentModel = $currentModel ?? ($models[0] ?? ['id' => '']);
 ?>
 <!-- Model Select Dialog -->
 <div id="model-dialog" class="hidden fixed inset-0 z-50 dialog-overlay" onclick="closeModelDialog()" style="display: none;">

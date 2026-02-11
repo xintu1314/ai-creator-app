@@ -53,12 +53,23 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             <?php foreach ($filteredHistory as $item): ?>
                 <div class="group cursor-pointer bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
-                    <div class="relative aspect-[3/4]">
-                        <img
-                            src="<?= htmlspecialchars($item['image']) ?>"
-                            alt="<?= htmlspecialchars($item['title']) ?>"
-                            class="w-full h-full object-cover"
-                        />
+                    <div class="relative aspect-[3/4] bg-[#F7F7F7]">
+                        <?php if (($item['type'] ?? '') === 'video'): ?>
+                            <video
+                                src="<?= htmlspecialchars($item['image']) ?>"
+                                class="w-full h-full object-cover"
+                                muted
+                                playsinline
+                                preload="metadata"
+                            ></video>
+                        <?php else: ?>
+                            <img
+                                src="<?= htmlspecialchars($item['image']) ?>"
+                                alt="<?= htmlspecialchars($item['title']) ?>"
+                                class="w-full h-full object-cover"
+                                loading="lazy"
+                            />
+                        <?php endif; ?>
                         <div class="absolute top-2 left-2">
                             <span class="px-2 py-0.5 text-[10px] rounded backdrop-blur-sm text-white <?= $item['type'] === 'image' ? 'bg-blue-500/80' : 'bg-purple-500/80' ?>">
                                 <?= $item['type'] === 'image' ? '图片' : '视频' ?>

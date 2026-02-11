@@ -3,6 +3,8 @@
 $contentType = $_POST['content_type'] ?? 'image';
 $selectedModel = $_POST['selected_model'] ?? '';
 $selectedCategory = $_POST['selected_category'] ?? '';
+$currentUserId = !empty($currentUser['id']) ? (int)$currentUser['id'] : 0;
+$myPublishedTemplates = $currentUserId > 0 ? get_templates_by_user($currentUserId, 'all', 30) : [];
 
 $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
 ?>
@@ -120,6 +122,53 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 发布
             </button>
         </form>
+    </div>
+
+    <!-- Publish History -->
+    <div class="mt-6 bg-white rounded-lg p-6 border border-[#E5E5E5]">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-medium text-[#1A1A1A]">我的发布历史</h2>
+            <?php if ($currentUserId <= 0): ?>
+                <button type="button" onclick="openAuthDialog('login')" class="h-8 px-3 text-xs font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors">
+                    登录后查看
+                </button>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($currentUserId <= 0): ?>
+            <p class="text-sm text-[#666666]">登录后可查看你发布过的模板。</p>
+        <?php elseif (empty($myPublishedTemplates)): ?>
+            <p class="text-sm text-[#666666]">你还没有发布过模板。</p>
+        <?php else: ?>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <?php foreach ($myPublishedTemplates as $tpl): ?>
+                    <div class="bg-[#FAFAFA] border border-[#EAEAEA] rounded-xl overflow-hidden">
+                        <div class="relative aspect-[3/4]">
+                            <img
+                                src="<?= htmlspecialchars($tpl['image']) ?>"
+                                alt="<?= htmlspecialchars($tpl['title']) ?>"
+                                class="w-full h-full object-cover"
+                                loading="lazy"
+                            />
+                            <div class="absolute top-2 left-2 flex items-center gap-1">
+                                <span class="px-2 py-0.5 text-[10px] rounded text-white <?= ($tpl['type'] ?? 'image') === 'video' ? 'bg-purple-500/80' : 'bg-blue-500/80' ?>">
+                                    <?= ($tpl['type'] ?? 'image') === 'video' ? '视频' : '图片' ?>
+                                </span>
+                                <?php if (!empty($tpl['category'])): ?>
+                                    <span class="px-2 py-0.5 text-[10px] rounded bg-black/45 text-white">
+                                        <?= htmlspecialchars($tpl['category']) ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="p-3">
+                            <p class="text-sm font-medium text-[#1A1A1A] mb-1 line-clamp-1"><?= htmlspecialchars($tpl['title']) ?></p>
+                            <p class="text-xs text-[#666666] line-clamp-1"><?= htmlspecialchars($tpl['model']) ?></p>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 

@@ -55,21 +55,38 @@ try {
     }
 
     $pdo = get_db();
-    $stmt = $pdo->prepare("
-        INSERT INTO publish_templates (user_id, content_type, model_id, model_name, category, title, content, image)
-        VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image)
-        RETURNING id
-    ");
-    $stmt->execute([
-        'user_id' => $userId,
-        'content_type' => $contentType,
-        'model_id' => $modelId,
-        'model_name' => $modelName,
-        'category' => $category,
-        'title' => $title,
-        'content' => $content,
-        'image' => $image ?: null,
-    ]);
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO publish_templates (user_id, content_type, model_id, model_name, category, title, content, image)
+            VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image)
+            RETURNING id
+        ");
+        $stmt->execute([
+            'user_id' => $userId,
+            'content_type' => $contentType,
+            'model_id' => $modelId,
+            'model_name' => $modelName,
+            'category' => $category,
+            'title' => $title,
+            'content' => $content,
+            'image' => $image ?: null,
+        ]);
+    } catch (Throwable $e) {
+        // 兼容旧库：publish_templates 可能尚未包含 image/model_name 列
+        $stmt = $pdo->prepare("
+            INSERT INTO publish_templates (user_id, content_type, model_id, category, title, content)
+            VALUES (:user_id, :content_type, :model_id, :category, :title, :content)
+            RETURNING id
+        ");
+        $stmt->execute([
+            'user_id' => $userId,
+            'content_type' => $contentType,
+            'model_id' => $modelId,
+            'category' => $category,
+            'title' => $title,
+            'content' => $content,
+        ]);
+    }
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     $id = $row['id'];
 
