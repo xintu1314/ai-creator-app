@@ -1,7 +1,8 @@
 <?php
 // 从共享数据层加载资产（与 api/assets 同源）
 $activeFilter = $_GET['filter'] ?? 'all';
-$historyItems = get_assets($activeFilter);
+$currentUserId = !empty($currentUser['id']) ? (int)$currentUser['id'] : 0;
+$historyItems = get_assets($activeFilter, 1, 100, $currentUserId);
 $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
 ?>
 <div class="max-w-[1200px] mx-auto p-6">
@@ -41,7 +42,14 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
     </div>
 
     <!-- History Grid -->
-    <?php if (count($filteredHistory) > 0): ?>
+    <?php if (empty($currentUser)): ?>
+        <div class="text-center py-20 text-[#666666]">
+            <p class="mb-3">登录后可查看你的资产</p>
+            <button type="button" onclick="openAuthDialog('login')" class="h-9 px-4 text-sm font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors">
+                去登录
+            </button>
+        </div>
+    <?php elseif (count($filteredHistory) > 0): ?>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             <?php foreach ($filteredHistory as $item): ?>
                 <div class="group cursor-pointer bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">

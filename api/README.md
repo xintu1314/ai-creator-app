@@ -96,6 +96,61 @@ POST /api/generation/create.php
 }
 ```
 
+### 10. 发送登录验证码（手机号）
+
+```
+POST /api/auth/send_code.php
+Content-Type: application/json
+
+{
+  "phone": "13800138000"
+}
+```
+
+### 11. 注册（手机号 + 密码）
+
+```
+POST /api/auth/register.php
+Content-Type: application/json
+
+{
+  "phone": "13800138000",
+  "password": "12345678",
+  "nickname": "可选昵称"
+}
+```
+
+### 12. 登录（手机号 + 验证码 或 手机号 + 密码）
+
+```
+POST /api/auth/login.php
+Content-Type: application/json
+
+{
+  "phone": "13800138000",
+  "code": "123456"
+}
+
+或
+
+{
+  "phone": "13800138000",
+  "password": "12345678"
+}
+```
+
+### 13. 当前登录态
+
+```
+GET /api/auth/me.php
+```
+
+### 14. 退出登录
+
+```
+POST /api/auth/logout.php
+```
+
 ## OSS 配置
 
 详见 [OSS 配置说明](OSS_SETUP.md)
@@ -103,6 +158,18 @@ POST /api/generation/create.php
 ## AI 配置
 
 详见 [AI 接口配置说明](AI_SETUP.md)
+
+## 短信配置（手机号登录）
+
+详见 [短信配置说明](SMS_SETUP.md)
+
+快速配置：复制 `api/config/sms.example.php` 为 `api/config/sms.local.php`，填写：
+- `access_key_id` / `access_key_secret`（阿里云 AccessKey）
+- `sign_name`（短信签名）
+- `template_code_login`（验证码模板 CODE）
+- `enabled` 设为 `true`
+
+调试期可设 `debug_return_code => true`，接口会在返回中带 `debugCode`，便于本地联调。
 
 ## 测试
 
@@ -116,3 +183,45 @@ php -S localhost:8000
 - http://localhost:8000/api/models/index.php?type=image
 - http://localhost:8000/api/templates/index.php?type=video
 - http://localhost:8000/api/categories/index.php
+
+### 15. 我的积分与定价配置
+
+```
+GET /api/points/me.php
+```
+
+### 16. 积分充值（开发版直充）
+
+```
+POST /api/points/recharge.php
+Content-Type: application/json
+
+{
+  "packageId": "pkg_9_9|pkg_19_9|pkg_29_9"
+}
+```
+
+### 17. 开通会员（开发版直开）
+
+```
+POST /api/points/subscribe.php
+Content-Type: application/json
+
+{
+  "planId": "member_first_month|member_renew_month|member_single_month|member_year"
+}
+```
+
+## 当前积分定价
+
+- 单图消耗（2K）：banana=5 分，banana pro=10 分
+- 单图消耗（4K）：在 2K 基础上 +80%（banana=9 分，banana pro=18 分）
+- 单独购买积分包：
+  - 9.9 元 = 165 分
+  - 19.9 元 = 335 分
+  - 29.9 元 = 505 分
+- 会员：每天赠送 16 分，每天 12:00 重置，不叠加
+  - 首月会员 29.9 元
+  - 连续续费 39.9 元 / 月
+  - 单月购买 49.9 元 / 月
+  - 年会员 299 元 / 年

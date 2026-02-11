@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
 require_once __DIR__ . '/../common/db.php';
+require_once __DIR__ . '/../common/auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Method not allowed', 405);
@@ -47,13 +48,20 @@ if (empty($modelName)) {
 }
 
 try {
+    $userId = auth_get_current_user_id();
+    if ($userId <= 0) {
+        json_error('请先登录后再发布', 401);
+        exit;
+    }
+
     $pdo = get_db();
     $stmt = $pdo->prepare("
         INSERT INTO publish_templates (user_id, content_type, model_id, model_name, category, title, content, image)
-        VALUES (0, :content_type, :model_id, :model_name, :category, :title, :content, :image)
+        VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image)
         RETURNING id
     ");
     $stmt->execute([
+        'user_id' => $userId,
         'content_type' => $contentType,
         'model_id' => $modelId,
         'model_name' => $modelName,

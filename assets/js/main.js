@@ -12,6 +12,270 @@ function changeType(type) {
 }
 
 // ============================
+// 账号认证：登录/注册/退出
+// ============================
+function openAuthDialog(mode = 'login') {
+    const dialog = document.getElementById('auth-dialog');
+    if (!dialog) return;
+    dialog.classList.remove('hidden');
+    dialog.style.display = 'flex';
+    switchAuthTab(mode);
+}
+
+function closeAuthDialog() {
+    const dialog = document.getElementById('auth-dialog');
+    if (!dialog) return;
+    dialog.classList.add('hidden');
+    dialog.style.display = 'none';
+    setAuthError('');
+}
+
+function switchAuthTab(mode) {
+    const normalized = mode === 'register' ? 'register' : 'login';
+    const modeInput = document.getElementById('auth-mode');
+    const loginTab = document.getElementById('auth-tab-login');
+    const registerTab = document.getElementById('auth-tab-register');
+    const subtitle = document.getElementById('auth-subtitle');
+    const nicknameWrap = document.getElementById('auth-register-nickname-wrap');
+    const submitBtn = document.getElementById('auth-submit-btn');
+    if (modeInput) modeInput.value = normalized;
+
+    const selectedClass = 'bg-white text-[#2563EB] shadow-sm';
+    const normalClass = 'text-[#64748B]';
+    if (loginTab) {
+        loginTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'login' ? selectedClass : normalClass);
+    }
+    if (registerTab) {
+        registerTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'register' ? selectedClass : normalClass);
+    }
+
+    if (subtitle) subtitle.textContent = normalized === 'login' ? '手机号 + 密码登录，未注册请先注册' : '手机号 + 密码注册，已注册请直接登录';
+    if (submitBtn) submitBtn.textContent = normalized === 'login' ? '登录' : '注册';
+    if (nicknameWrap) nicknameWrap.classList.toggle('hidden', normalized !== 'register');
+    setAuthError('');
+}
+
+function setAuthError(msg) {
+    const errEl = document.getElementById('auth-error');
+    if (!errEl) return;
+    if (msg) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+    } else {
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+    }
+}
+
+async function submitAuthForm(event) {
+    event.preventDefault();
+    const mode = document.getElementById('auth-mode')?.value === 'register' ? 'register' : 'login';
+    const phone = (document.getElementById('auth-phone')?.value || '').trim();
+    const password = document.getElementById('auth-password')?.value || '';
+    const nickname = (document.getElementById('auth-nickname')?.value || '').trim();
+    const submitBtn = document.getElementById('auth-submit-btn');
+
+    if (!/^1\d{10}$/.test(phone)) {
+        setAuthError('请输入正确的11位手机号');
+        return;
+    }
+    if (password.length < 6 || password.length > 64) {
+        setAuthError('密码长度为6-64位');
+        return;
+    }
+
+    setAuthError('');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
+        submitBtn.textContent = mode === 'register' ? '注册中...' : '登录中...';
+    }
+
+    try {
+        const endpoint = mode === 'register' ? 'api/auth/register.php' : 'api/auth/login.php';
+        const payload = { phone, password };
+        if (mode === 'register' && nickname) payload.nickname = nickname;
+
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            setAuthError(data.message || '操作失败，请稍后重试');
+            return;
+        }
+        window.location.reload();
+    } catch (err) {
+        setAuthError('网络异常，请稍后重试');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+            submitBtn.textContent = mode === 'register' ? '注册' : '登录';
+        }
+    }
+}
+
+function setSendCodeBtnText(text, disabled = false) {
+    const btn = document.getElementById('send-code-btn');
+    if (!btn) return;
+    btn.textContent = text;
+    btn.disabled = disabled;
+    if (disabled) btn.classList.add('opacity-70', 'cursor-not-allowed');
+    else btn.classList.remove('opacity-70', 'cursor-not-allowed');
+}
+
+function startSendCodeCountdown(seconds) {
+    let left = Math.max(1, Number(seconds || 60));
+    setSendCodeBtnText(`${left}s后重发`, true);
+    const timer = setInterval(() => {
+        left -= 1;
+        if (left <= 0) {
+            clearInterval(timer);
+            setSendCodeBtnText('获取验证码', false);
+            return;
+        }
+        setSendCodeBtnText(`${left}s后重发`, true);
+    }, 1000);
+}
+
+async function sendLoginCode() {
+    const phone = (document.getElementById('auth-phone')?.value || '').trim();
+    if (!/^1\d{10}$/.test(phone)) {
+        setAuthError('请输入正确的11位手机号');
+        return;
+    }
+    setAuthError('');
+    setSendCodeBtnText('发送中...', true);
+    try {
+        const res = await fetch('api/auth/send_code.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            setAuthError(data.message || '验证码发送失败');
+            setSendCodeBtnText('获取验证码', false);
+            return;
+        }
+        if (data.data?.debugCode) {
+            setAuthError(`调试验证码：${data.data.debugCode}`);
+        }
+        startSendCodeCountdown(data.data?.expiresIn || 60);
+    } catch (err) {
+        setAuthError('网络异常，验证码发送失败');
+        setSendCodeBtnText('获取验证码', false);
+    }
+}
+
+async function logout() {
+    try {
+        const res = await fetch('api/auth/logout.php', { method: 'POST' });
+        const data = await res.json();
+        if (!data.success) {
+            updateStatusBar(data.message || '退出失败');
+            return;
+        }
+        window.location.reload();
+    } catch (err) {
+        updateStatusBar('网络异常，退出失败');
+    }
+}
+
+function openPointsDialog() {
+    if (!window.currentUser || !window.currentUser.id) {
+        openAuthDialog('login');
+        return;
+    }
+    const dialog = document.getElementById('points-dialog');
+    if (!dialog) return;
+    dialog.classList.remove('hidden');
+    dialog.style.display = 'flex';
+}
+
+function closePointsDialog() {
+    const dialog = document.getElementById('points-dialog');
+    if (!dialog) return;
+    dialog.classList.add('hidden');
+    dialog.style.display = 'none';
+}
+
+function openMembershipDialog() {
+    if (!window.currentUser || !window.currentUser.id) {
+        openAuthDialog('login');
+        return;
+    }
+    const dialog = document.getElementById('membership-dialog');
+    if (!dialog) return;
+    dialog.classList.remove('hidden');
+    dialog.style.display = 'flex';
+}
+
+function closeMembershipDialog() {
+    const dialog = document.getElementById('membership-dialog');
+    if (!dialog) return;
+    dialog.classList.add('hidden');
+    dialog.style.display = 'none';
+}
+
+async function refreshPointsSummary() {
+    if (!window.currentUser || !window.currentUser.id) return;
+    try {
+        const res = await fetch('api/points/me.php');
+        const data = await res.json();
+        if (!data.success || !data.data?.wallet) return;
+        window.pointsSummary = data.data.wallet;
+        const el = document.getElementById('header-points-balance');
+        if (el) el.textContent = String(data.data.wallet.totalBalance || 0);
+    } catch (err) {
+        // ignore
+    }
+}
+
+async function rechargePoints(packageId) {
+    try {
+        const res = await fetch('api/points/recharge.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ packageId }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.message || '充值失败');
+            return;
+        }
+        closePointsDialog();
+        await refreshPointsSummary();
+        alert('充值成功，积分已到账');
+    } catch (err) {
+        alert('网络异常，充值失败');
+    }
+}
+
+async function subscribeMembership(planId) {
+    try {
+        const res = await fetch('api/points/subscribe.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ planId }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.message || '开通失败');
+            return;
+        }
+        closeMembershipDialog();
+        await refreshPointsSummary();
+        alert('会员开通成功，每天12点赠送16积分并重置');
+    } catch (err) {
+        alert('网络异常，开通失败');
+    }
+}
+
+// ============================
 // 对话框：模型选择
 // ============================
 function openModelDialog() {
@@ -565,6 +829,12 @@ function updateStatusBar(text) {
 // 核心：生成处理 - 调用后端 API
 // ============================
 async function handleGenerate() {
+    if (!window.currentUser || !window.currentUser.id) {
+        openAuthDialog('login');
+        updateStatusBar('请先登录后再生成');
+        return;
+    }
+
     // 全局防重：已有任务在生成时，禁止再次提交生图请求（避免重复扣点）
     if (isGeneratingNow()) {
         updateStatusBar('已有任务生成中，请稍候...');
@@ -649,6 +919,7 @@ async function handleGenerate() {
         }
 
         if (data.success) {
+            refreshPointsSummary();
             const taskId = data.data?.taskId;
             const taskIds = Array.isArray(data.data?.taskIds) && data.data.taskIds.length > 0
                 ? data.data.taskIds
@@ -804,8 +1075,16 @@ document.addEventListener('DOMContentLoaded', function () {
     // 确保对话框初始状态隐藏
     const modelDialog = document.getElementById('model-dialog');
     const paramsDialog = document.getElementById('params-dialog');
+    const authDialog = document.getElementById('auth-dialog');
+    const pointsDialog = document.getElementById('points-dialog');
+    const membershipDialog = document.getElementById('membership-dialog');
     if (modelDialog) modelDialog.style.display = 'none';
     if (paramsDialog) paramsDialog.style.display = 'none';
+    if (authDialog) authDialog.style.display = 'none';
+    if (pointsDialog) pointsDialog.style.display = 'none';
+    if (membershipDialog) membershipDialog.style.display = 'none';
+
+    refreshPointsSummary();
 
     // Ctrl+Enter / Cmd+Enter 快捷键生成
     const promptInput = document.getElementById('prompt-input');

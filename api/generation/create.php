@@ -6,6 +6,8 @@
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
 require_once __DIR__ . '/../common/db.php';
+require_once __DIR__ . '/../common/auth.php';
+require_once __DIR__ . '/../common/points.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Method not allowed', 405);
@@ -59,6 +61,12 @@ $mapQuality = function ($q) {
 };
 
 try {
+    $userId = auth_get_current_user_id();
+    if ($userId <= 0) {
+        json_error('请先登录后再生成', 401);
+        exit;
+    }
+
     $pdo = get_db();
 
     if ($type === 'image' && in_array($model, ['banana', 'banana pro', 'banana-pro'])) {
@@ -77,13 +85,39 @@ try {
         $requestedCount = max(1, min(4, (int)($params['count'] ?? 1)));
         $localTaskIds = [];
         $submittedCount = 0;
+        $pointsPerTask = points_calculate_image_points($modelId, (string)$params['quality']);
+        $lastConsumeError = '';
+
         $stmt = $pdo->prepare("
             INSERT INTO tasks (id, user_id, type, status, params_json)
-            VALUES (:id, 0, :type, 'processing', :params)
+            VALUES (:id, :user_id, :type, 'processing', :params)
         ");
 
         for ($i = 0; $i < $requestedCount; $i++) {
             $loopTaskId = $i === 0 ? $taskId : ('task_' . uniqid() . '_' . time() . '_' . $i);
+
+            $consumeRet = points_consume(
+                $userId,
+                $pointsPerTask,
+                'generate_consume',
+                '图片生成扣费',
+                [
+                    'taskId' => $loopTaskId,
+                    'model' => $modelId,
+                    'quality' => strtolower((string)$params['quality']),
+                    'index' => $i + 1,
+                    'requestedCount' => $requestedCount,
+                ]
+            );
+            if (!$consumeRet['success']) {
+                $lastConsumeError = $consumeRet['message'] ?? '积分不足';
+                if ($submittedCount === 0) {
+                    json_error($lastConsumeError);
+                    exit;
+                }
+                break;
+            }
+
             $result = wuyinkeji_submit_image($modelId, $prompt, $options);
             if (function_exists('wuyinkeji_log')) {
                 wuyinkeji_log('create.submit_result', [
@@ -98,7 +132,18 @@ try {
             }
 
             if (!$result['success']) {
-                // 第一张都失败 -> 直接报错；部分失败 -> 继续返回已提交结果
+                // 本张提交失败时退回本张积分
+                points_refund_to_paid(
+                    $userId,
+                    $pointsPerTask,
+                    'generate_refund_submit_fail',
+                    '图片任务提交失败退回积分',
+                    [
+                        'taskId' => $loopTaskId,
+                        'model' => $modelId,
+                    ]
+                );
+
                 if ($submittedCount === 0) {
                     json_error($result['message'] ?? '提交失败');
                     exit;
@@ -111,9 +156,13 @@ try {
             $loopParams['count_requested'] = $requestedCount;
             $loopParams['count_index'] = $i + 1;
             $loopParams['count_total_submitted'] = $requestedCount;
+            $loopParams['points_charged'] = $pointsPerTask;
+            $loopParams['points_charged_paid'] = (int)($consumeRet['paidUsed'] ?? $pointsPerTask);
+            $loopParams['points_charged_bonus'] = (int)($consumeRet['bonusUsed'] ?? 0);
 
             $stmt->execute([
                 'id' => $loopTaskId,
+                'user_id' => $userId,
                 'type' => $type,
                 'params' => json_encode($loopParams, JSON_UNESCAPED_UNICODE),
             ]);
@@ -131,7 +180,7 @@ try {
         }
 
         if ($submittedCount === 0) {
-            json_error('任务提交失败');
+            json_error($lastConsumeError ?: '任务提交失败');
             exit;
         }
 
@@ -139,12 +188,16 @@ try {
             ? "已提交 {$submittedCount} 个任务，请在资产中心查看全部结果"
             : '任务已提交，请在资产中心查看生成结果';
 
+        $wallet = points_get_wallet_summary($userId);
+
         json_success([
             'taskId' => $localTaskIds[0],
             'taskIds' => $localTaskIds,
             'submittedCount' => $submittedCount,
             'status' => 'processing',
             'message' => $respMsg,
+            'pointsPerImage' => $pointsPerTask,
+            'wallet' => $wallet,
         ]);
     } elseif ($type === 'video' && in_array($model, ['豆包视频', 'doubao-video'])) {
         // 视频：豆包视频（待接入）
@@ -152,10 +205,11 @@ try {
 
         $stmt = $pdo->prepare("
             INSERT INTO tasks (id, user_id, type, status, params_json)
-            VALUES (:id, 0, :type, 'pending', :params)
+            VALUES (:id, :user_id, :type, 'pending', :params)
         ");
         $stmt->execute([
             'id' => $taskId,
+            'user_id' => $userId,
             'type' => $type,
             'params' => json_encode($params, JSON_UNESCAPED_UNICODE),
         ]);

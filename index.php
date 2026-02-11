@@ -1,6 +1,8 @@
 <?php
 session_start();
 
+require_once __DIR__ . '/api/common/auth.php';
+require_once __DIR__ . '/api/common/points.php';
 require_once __DIR__ . '/api/data/models.php';
 require_once __DIR__ . '/api/data/templates.php';
 require_once __DIR__ . '/api/data/categories.php';
@@ -20,6 +22,8 @@ $imageModels = get_models('image');
 $videoModels = get_models('video');
 $categories = get_categories();
 $currentModel = ($creationType === 'video' ? $videoModels : $imageModels)[0] ?? null;
+$currentUser = auth_get_current_user();
+$pointsSummary = !empty($currentUser['id']) ? points_get_wallet_summary((int)$currentUser['id']) : null;
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -75,6 +79,9 @@ $currentModel = ($creationType === 'video' ? $videoModels : $imageModels)[0] ?? 
     
     <script src="assets/js/main.js"></script>
     <script>
+        window.currentUser = <?= json_encode($currentUser, JSON_UNESCAPED_UNICODE) ?>;
+        window.pointsSummary = <?= json_encode($pointsSummary, JSON_UNESCAPED_UNICODE) ?>;
+
         // 确保页面加载完成后初始化
         window.addEventListener('load', function() {
             // 初始化Lucide图标

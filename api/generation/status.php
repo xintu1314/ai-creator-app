@@ -7,6 +7,8 @@ require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../data/assets.php';
+require_once __DIR__ . '/../common/auth.php';
+require_once __DIR__ . '/../common/points.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_error('Method not allowed', 405);
@@ -20,9 +22,15 @@ if (empty($taskId)) {
 }
 
 try {
+    $userId = auth_get_current_user_id();
+    if ($userId <= 0) {
+        json_error('请先登录', 401);
+        exit;
+    }
+
     $pdo = get_db();
-    $stmt = $pdo->prepare("SELECT id, type, status, params_json, result_url, error_message FROM tasks WHERE id = ?");
-    $stmt->execute([$taskId]);
+    $stmt = $pdo->prepare("SELECT id, user_id, type, status, params_json, result_url, error_message FROM tasks WHERE id = ? AND user_id = ?");
+    $stmt->execute([$taskId, $userId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$row) {
@@ -48,14 +56,15 @@ $ensureAssetExists = function (array $taskRow, array $taskParams): void {
 
     try {
         $pdo = get_db();
-        $check = $pdo->prepare("SELECT id FROM assets WHERE image = :image AND type = :type LIMIT 1");
+        $check = $pdo->prepare("SELECT id FROM assets WHERE user_id = :user_id AND image = :image AND type = :type LIMIT 1");
         $check->execute([
+            'user_id' => (int)$taskRow['user_id'],
             'image' => $imageUrl,
             'type' => $taskRow['type'],
         ]);
         $exists = $check->fetch(PDO::FETCH_ASSOC);
         if (!$exists) {
-            add_asset($title, $imageUrl, $taskRow['type'], $model, $prompt, 0);
+            add_asset($title, $imageUrl, $taskRow['type'], $model, $prompt, (int)$taskRow['user_id']);
         }
     } catch (Throwable $e) {
         // 资产入库失败不影响状态接口返回
@@ -140,13 +149,33 @@ $ensureAssetExists = function (array $taskRow, array $taskParams): void {
         } elseif ($status === 3) {
             // 失败
             $errMsg = $result['fail_reason'] ?: '生成失败';
-            $stmt = $pdo->prepare("UPDATE tasks SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt = $pdo->prepare("UPDATE tasks SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> 'failed'");
             $stmt->execute([$errMsg, $taskId]);
+            $justFailed = $stmt->rowCount() > 0;
+
+            if ($justFailed) {
+                $refundPoints = (int)($params['points_charged'] ?? 0);
+                if ($refundPoints > 0) {
+                    points_refund_to_paid(
+                        (int)$row['user_id'],
+                        $refundPoints,
+                        'generate_refund_failed',
+                        '图片生成失败退回积分',
+                        [
+                            'taskId' => $taskId,
+                            'model' => $params['model'] ?? '',
+                            'quality' => $params['quality'] ?? '',
+                        ]
+                    );
+                }
+            }
+
             if (function_exists('wuyinkeji_log')) {
                 wuyinkeji_log('status.db_updated_failed', [
                     'local_task_id' => $taskId,
                     'external_task_id' => (string)$externalId,
                     'error_message' => $errMsg,
+                    'just_failed' => $justFailed,
                 ]);
             }
             json_success([

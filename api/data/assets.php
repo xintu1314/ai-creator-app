@@ -4,15 +4,15 @@
  */
 require_once __DIR__ . '/../common/db.php';
 
-function get_assets($filter = 'all', $page = 1, $limit = 50) {
+function get_assets($filter = 'all', $page = 1, $limit = 50, $userId = 0) {
     try {
         $pdo = get_db();
     } catch (Throwable $e) {
         return [];
     }
 
-    $sql = "SELECT id, title, image, type, model, prompt, created_at FROM assets WHERE 1=1";
-    $params = [];
+    $sql = "SELECT id, title, image, type, model, prompt, created_at FROM assets WHERE user_id = :user_id";
+    $params = ['user_id' => max(0, (int)$userId)];
     if ($filter === 'image') {
         $sql .= " AND type = :type";
         $params['type'] = 'image';

@@ -44,3 +44,70 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_created ON tasks(created_at DESC);
+
+-- 用户表（账号密码）
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    account VARCHAR(32) NOT NULL UNIQUE,
+    phone VARCHAR(20) UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    nickname VARCHAR(100) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_account ON users(account);
+
+-- 用户积分钱包
+CREATE TABLE IF NOT EXISTS user_wallets (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    paid_balance INTEGER NOT NULL DEFAULT 0,
+    bonus_balance INTEGER NOT NULL DEFAULT 0,
+    bonus_cycle_key VARCHAR(20),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_wallets_updated ON user_wallets(updated_at DESC);
+
+-- 积分流水
+CREATE TABLE IF NOT EXISTS points_ledger (
+    id BIGSERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    change_amount INTEGER NOT NULL,
+    balance_after INTEGER NOT NULL,
+    source VARCHAR(40) NOT NULL,
+    description VARCHAR(255) DEFAULT '',
+    meta_json JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_points_ledger_user_created ON points_ledger(user_id, created_at DESC);
+
+-- 会员状态（单用户一条）
+CREATE TABLE IF NOT EXISTS user_memberships (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    plan_code VARCHAR(40) NOT NULL,
+    daily_bonus_points INTEGER NOT NULL DEFAULT 16,
+    started_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled')),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_memberships_expires ON user_memberships(expires_at DESC);
+
+-- 短信验证码
+CREATE TABLE IF NOT EXISTS sms_verification_codes (
+    id BIGSERIAL PRIMARY KEY,
+    phone VARCHAR(20) NOT NULL,
+    purpose VARCHAR(32) NOT NULL DEFAULT 'login',
+    code VARCHAR(6) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'used', 'expired')),
+    ip VARCHAR(64) DEFAULT '',
+    expires_at TIMESTAMP NOT NULL,
+    used_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sms_phone_created ON sms_verification_codes(phone, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sms_phone_purpose_status ON sms_verification_codes(phone, purpose, status);
