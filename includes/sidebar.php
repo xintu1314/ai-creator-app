@@ -2,9 +2,13 @@
 $navItems = [
     ['id' => 'create', 'icon' => 'sparkles', 'label' => '创作'],
     ['id' => 'assets', 'icon' => 'folder-open', 'label' => '资产'],
+    ['id' => 'profile', 'icon' => 'user-round', 'label' => '用户中心'],
     ['id' => 'publish', 'icon' => 'send', 'label' => '发布'],
     ['id' => 'tutorial', 'icon' => 'book-open', 'label' => '教程'],
 ];
+if (!empty($currentUser) && auth_is_admin()) {
+    $navItems[] = ['id' => 'admin', 'icon' => 'shield-check', 'label' => '管理后台'];
+}
 ?>
 <aside class="fixed left-0 top-0 h-screen w-16 bg-white border-r border-[#E5E5E5] flex flex-col items-center py-4 z-50">
     <!-- Logo -->

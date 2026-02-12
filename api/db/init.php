@@ -45,6 +45,10 @@ if ($count == 0) {
 $pdo->exec(file_get_contents(__DIR__ . '/migrate_templates.sql'));
 echo "✅ 模板表结构迁移完成\n";
 
+// 管理后台迁移：权限、教程、审核、审计
+$pdo->exec(file_get_contents(__DIR__ . '/migrate_admin.sql'));
+echo "✅ 管理后台表结构迁移完成\n";
+
 // 模板 seed：若不存在 seed 模板则导入
 $tplCount = $pdo->query("SELECT COUNT(*) FROM publish_templates WHERE title = '周四周四，生不如死'")->fetchColumn();
 if ($tplCount == 0) {

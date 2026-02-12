@@ -330,6 +330,52 @@ function points_add_paid(int $userId, int $points, string $source, string $descr
     }
 }
 
+function points_admin_adjust_paid(int $userId, int $delta, string $description, array $meta = []): array {
+    if ($delta === 0) {
+        return ['success' => false, 'message' => '调整值不能为0'];
+    }
+
+    $pdo = get_db();
+    $pdo->beginTransaction();
+    try {
+        $wallet = points_ensure_wallet($pdo, $userId);
+        $newPaid = (int)$wallet['paid_balance'] + $delta;
+        if ($newPaid < 0) {
+            $pdo->rollBack();
+            return ['success' => false, 'message' => '付费积分不足，无法扣减'];
+        }
+
+        $newBonus = (int)$wallet['bonus_balance'];
+        $newTotal = $newPaid + $newBonus;
+
+        $upd = $pdo->prepare("
+            UPDATE user_wallets
+            SET paid_balance = :paid_balance,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = :user_id
+        ");
+        $upd->execute([
+            'paid_balance' => $newPaid,
+            'user_id' => $userId,
+        ]);
+
+        points_write_ledger($pdo, $userId, $delta, $newTotal, 'admin_adjust', $description, $meta);
+        $pdo->commit();
+
+        return [
+            'success' => true,
+            'wallet' => [
+                'paidBalance' => $newPaid,
+                'bonusBalance' => $newBonus,
+                'totalBalance' => $newTotal,
+            ],
+        ];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return ['success' => false, 'message' => '管理员积分调整失败：' . $e->getMessage()];
+    }
+}
+
 function points_subscribe_membership(int $userId, string $planId): array {
     $cfg = points_get_pricing_config();
     $plan = null;

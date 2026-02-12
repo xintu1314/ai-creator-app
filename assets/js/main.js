@@ -67,10 +67,16 @@ function setAuthError(msg) {
     }
 }
 
+function normalizePhone(phone) {
+    const digits = String(phone || '').replace(/\D+/g, '');
+    if (/^86(1\d{10})$/.test(digits)) return digits.slice(2);
+    return digits;
+}
+
 async function submitAuthForm(event) {
     event.preventDefault();
     const mode = document.getElementById('auth-mode')?.value === 'register' ? 'register' : 'login';
-    const phone = (document.getElementById('auth-phone')?.value || '').trim();
+    const phone = normalizePhone((document.getElementById('auth-phone')?.value || '').trim());
     const password = document.getElementById('auth-password')?.value || '';
     const nickname = (document.getElementById('auth-nickname')?.value || '').trim();
     const submitBtn = document.getElementById('auth-submit-btn');
@@ -142,7 +148,7 @@ function startSendCodeCountdown(seconds) {
 }
 
 async function sendLoginCode() {
-    const phone = (document.getElementById('auth-phone')?.value || '').trim();
+    const phone = normalizePhone((document.getElementById('auth-phone')?.value || '').trim());
     if (!/^1\d{10}$/.test(phone)) {
         setAuthError('请输入正确的11位手机号');
         return;

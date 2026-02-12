@@ -57,8 +57,8 @@ try {
     $pdo = get_db();
     try {
         $stmt = $pdo->prepare("
-            INSERT INTO publish_templates (user_id, content_type, model_id, model_name, category, title, content, image)
-            VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image)
+            INSERT INTO publish_templates (user_id, content_type, model_id, model_name, category, title, content, image, review_status, is_online)
+            VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image, 'pending', true)
             RETURNING id
         ");
         $stmt->execute([

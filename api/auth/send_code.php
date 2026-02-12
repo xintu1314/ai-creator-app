@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $raw = file_get_contents('php://input');
 $input = json_decode($raw, true) ?? [];
-$phone = trim((string)($input['phone'] ?? ''));
+$phone = sms_normalize_phone((string)($input['phone'] ?? ''));
 $purpose = 'login';
 
 if (!sms_is_valid_phone($phone)) {

@@ -11,7 +11,10 @@ $tutorials = get_tutorials();
             <?php foreach ($tutorials as $tutorial): ?>
                 <div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer">
                     <!-- Video Preview -->
-                    <div class="relative aspect-video bg-[#F5F5F5]">
+                    <div class="relative aspect-video bg-[#F5F5F5]" <?= !empty($tutorial['videoUrl']) ? 'onclick="openTutorialVideoPlayer(\'' . htmlspecialchars($tutorial['videoUrl'], ENT_QUOTES) . '\', \'' . htmlspecialchars($tutorial['title'], ENT_QUOTES) . '\')"' : '' ?>>
+                        <?php if (!empty($tutorial['coverUrl'])): ?>
+                            <img src="<?= htmlspecialchars($tutorial['coverUrl']) ?>" alt="<?= htmlspecialchars($tutorial['title']) ?>" class="w-full h-full object-cover" />
+                        <?php endif; ?>
                         <div class="absolute inset-0 flex items-center justify-center">
                             <i data-lucide="play" class="w-16 h-16 text-white bg-black/50 rounded-full p-4"></i>
                         </div>
@@ -25,6 +28,11 @@ $tutorials = get_tutorials();
                         <p class="text-sm text-[#666666] line-clamp-3">
                             <?= htmlspecialchars($tutorial['description']) ?>
                         </p>
+                        <?php if (!empty($tutorial['videoUrl'])): ?>
+                            <button type="button" onclick="openTutorialVideoPlayer('<?= htmlspecialchars($tutorial['videoUrl'], ENT_QUOTES) ?>', '<?= htmlspecialchars($tutorial['title'], ENT_QUOTES) ?>')" class="inline-flex mt-3 text-xs text-[#3B82F6] hover:text-[#2563EB]">
+                                查看视频
+                            </button>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -36,3 +44,42 @@ $tutorials = get_tutorials();
         </div>
     <?php endif; ?>
 </div>
+
+<!-- 教程视频播放弹层 -->
+<div id="tutorial-video-dialog" class="hidden fixed inset-0 z-50 bg-black/70 items-center justify-center p-4" onclick="closeTutorialVideoPlayer()" style="display:none;">
+    <div class="w-full max-w-[960px] bg-black rounded-xl overflow-hidden" onclick="event.stopPropagation()">
+        <div class="h-11 px-4 flex items-center justify-between bg-black/70 border-b border-white/10">
+            <div id="tutorial-video-title" class="text-sm text-white font-medium truncate">教程视频</div>
+            <button type="button" onclick="closeTutorialVideoPlayer()" class="h-8 px-3 text-xs text-white/90 hover:text-white hover:bg-white/10 rounded">关闭</button>
+        </div>
+        <div class="aspect-video bg-black">
+            <video id="tutorial-video-player" controls playsinline class="w-full h-full bg-black"></video>
+        </div>
+    </div>
+</div>
+
+<script>
+function openTutorialVideoPlayer(url, title) {
+    const dialog = document.getElementById('tutorial-video-dialog');
+    const player = document.getElementById('tutorial-video-player');
+    const titleEl = document.getElementById('tutorial-video-title');
+    if (!dialog || !player) return;
+    if (titleEl) titleEl.textContent = title || '教程视频';
+    player.src = url || '';
+    dialog.classList.remove('hidden');
+    dialog.style.display = 'flex';
+    const p = player.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+}
+
+function closeTutorialVideoPlayer() {
+    const dialog = document.getElementById('tutorial-video-dialog');
+    const player = document.getElementById('tutorial-video-player');
+    if (!dialog || !player) return;
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+    dialog.classList.add('hidden');
+    dialog.style.display = 'none';
+}
+</script>

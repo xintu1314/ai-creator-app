@@ -1,9 +1,21 @@
 <header class="h-14 bg-white border-b border-[#E5E5E5] flex items-center justify-between px-6 fixed top-0 left-16 right-0 z-40">
     <!-- Left - Breadcrumb -->
+    <?php
+    $tabTitleMap = [
+        'create' => '创作中心',
+        'assets' => '资产中心',
+        'profile' => '用户中心',
+        'publish' => '发布模板',
+        'tutorial' => '教程中心',
+        'inspiration' => '灵感库',
+        'admin' => '管理后台',
+    ];
+    $currentTabTitle = $tabTitleMap[$activeTab] ?? '创作中心';
+    ?>
     <div class="flex items-center gap-2">
         <span class="text-sm text-[#666666]">首页</span>
         <span class="text-sm text-[#999999]">/</span>
-        <span class="text-sm text-[#1A1A1A] font-medium">创作中心</span>
+        <span class="text-sm text-[#1A1A1A] font-medium"><?= htmlspecialchars($currentTabTitle) ?></span>
     </div>
 
     <!-- Right - Actions -->
@@ -49,16 +61,21 @@
 
             <!-- 用户信息 -->
             <div class="h-9 px-3 rounded-lg bg-[#F5F5F5] flex items-center gap-2">
-                <button
-                    type="button"
-                    class="h-7 w-7 rounded-full bg-[#3B82F6] flex items-center justify-center text-white"
-                    title="<?= htmlspecialchars($currentUser['account']) ?>"
+                <a
+                    href="?tab=profile"
+                    class="flex items-center gap-2 min-w-0 hover:opacity-90 transition-opacity"
+                    title="进入用户中心"
                 >
-                    <i data-lucide="user" class="w-4 h-4"></i>
-                </button>
-                <span class="text-sm text-[#1A1A1A] max-w-[120px] truncate">
-                    <?= htmlspecialchars($currentUser['nickname'] ?: $currentUser['account']) ?>
-                </span>
+                    <span
+                        class="h-7 w-7 rounded-full bg-[#3B82F6] flex items-center justify-center text-white flex-shrink-0"
+                        title="<?= htmlspecialchars($currentUser['account']) ?>"
+                    >
+                        <i data-lucide="user" class="w-4 h-4"></i>
+                    </span>
+                    <span class="text-sm text-[#1A1A1A] max-w-[120px] truncate">
+                        <?= htmlspecialchars($currentUser['nickname'] ?: $currentUser['account']) ?>
+                    </span>
+                </a>
                 <button type="button" onclick="logout()" class="text-xs text-[#3B82F6] hover:text-[#2563EB]">
                     退出
                 </button>

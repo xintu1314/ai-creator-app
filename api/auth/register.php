@@ -8,6 +8,7 @@ require_once __DIR__ . '/../common/response.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/sms.php';
+auth_ensure_user_admin_columns();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Method not allowed', 405);
@@ -17,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $raw = file_get_contents('php://input');
 $input = json_decode($raw, true) ?? [];
 
-$phone = trim((string)($input['phone'] ?? ''));
+$phone = sms_normalize_phone((string)($input['phone'] ?? ''));
 $password = (string)($input['password'] ?? '');
 $nickname = trim((string)($input['nickname'] ?? ''));
 
@@ -31,6 +32,11 @@ if (strlen($password) < 6 || strlen($password) > 64) {
 }
 if ($nickname === '') {
     $nickname = '用户' . substr($phone, 0, 3) . '****' . substr($phone, -4);
+}
+if (function_exists('mb_substr')) {
+    $nickname = mb_substr($nickname, 0, 100);
+} else {
+    $nickname = substr($nickname, 0, 100);
 }
 
 try {
@@ -47,7 +53,7 @@ try {
     $stmt = $pdo->prepare("
         INSERT INTO users (account, phone, password_hash, nickname)
         VALUES (:account, :phone, :password_hash, :nickname)
-        RETURNING id, account, phone, nickname
+        RETURNING id, account, phone, nickname, role, status
     ");
     $stmt->execute([
         'account' => $account,
@@ -71,6 +77,10 @@ try {
         ],
     ], '注册成功');
 } catch (Throwable $e) {
+    if ((string)$e->getCode() === '23505') {
+        json_error('手机号已注册，请直接登录');
+        exit;
+    }
     json_error('注册失败：' . $e->getMessage(), 500);
 }
 

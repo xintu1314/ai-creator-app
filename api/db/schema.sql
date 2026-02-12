@@ -21,9 +21,14 @@ CREATE TABLE IF NOT EXISTS publish_templates (
     user_id INTEGER DEFAULT 0,
     content_type VARCHAR(20) NOT NULL CHECK (content_type IN ('image', 'video')),
     model_id VARCHAR(100) NOT NULL,
+    model_name VARCHAR(100),
     category VARCHAR(50) NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
+    image VARCHAR(500),
+    review_status VARCHAR(20) NOT NULL DEFAULT 'approved' CHECK (review_status IN ('pending', 'approved', 'rejected')),
+    is_online BOOLEAN NOT NULL DEFAULT true,
+    review_note TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -52,10 +57,13 @@ CREATE TABLE IF NOT EXISTS users (
     phone VARCHAR(20) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     nickname VARCHAR(100) DEFAULT '',
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_account ON users(account);
+CREATE INDEX IF NOT EXISTS idx_users_role_status ON users(role, status);
 
 -- 用户积分钱包
 CREATE TABLE IF NOT EXISTS user_wallets (
@@ -111,3 +119,32 @@ CREATE TABLE IF NOT EXISTS sms_verification_codes (
 
 CREATE INDEX IF NOT EXISTS idx_sms_phone_created ON sms_verification_codes(phone, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sms_phone_purpose_status ON sms_verification_codes(phone, purpose, status);
+
+-- 教程表
+CREATE TABLE IF NOT EXISTS tutorials (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT '',
+    cover_url VARCHAR(500) DEFAULT '',
+    video_url VARCHAR(500) NOT NULL,
+    is_published BOOLEAN NOT NULL DEFAULT true,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_by INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_tutorials_published_sort ON tutorials(is_published, sort_order, created_at DESC);
+
+-- 管理员操作审计日志
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id BIGSERIAL PRIMARY KEY,
+    admin_user_id INTEGER NOT NULL,
+    action VARCHAR(80) NOT NULL,
+    target_type VARCHAR(40) DEFAULT '',
+    target_id VARCHAR(64) DEFAULT '',
+    payload_json JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_admin_created ON admin_audit_logs(admin_user_id, created_at DESC);

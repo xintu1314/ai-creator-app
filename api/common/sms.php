@@ -11,6 +11,19 @@ function sms_config(): array {
     return $cfg['aliyun'] ?? [];
 }
 
+function sms_normalize_phone(string $rawPhone): string {
+    $digits = preg_replace('/\D+/', '', $rawPhone) ?: '';
+    if ($digits === '') return '';
+    // 兼容 +86 / 86 前缀
+    if (preg_match('/^86(1\d{10})$/', $digits, $m)) {
+        return $m[1];
+    }
+    if (preg_match('/^1\d{10}$/', $digits)) {
+        return $digits;
+    }
+    return $digits;
+}
+
 function sms_is_valid_phone(string $phone): bool {
     return (bool)preg_match('/^1\d{10}$/', $phone);
 }

@@ -10,9 +10,11 @@ function get_templates($type = 'image') {
     try {
         $pdo = get_db();
         $stmt = $pdo->prepare("
-            SELECT id, title, image, model_name, model_id, content_type, category, content
+            SELECT id, title, image, model_name, model_id, content_type, category, content, review_status, is_online
             FROM publish_templates
             WHERE content_type = :type
+              AND review_status = 'approved'
+              AND is_online = true
             ORDER BY created_at DESC
         ");
         $stmt->execute(['type' => $type]);
@@ -50,6 +52,8 @@ function get_templates($type = 'image') {
             'type' => $row['content_type'],
             'category' => $row['category'] ?? '',
             'prompt' => trim((string)($row['content'] ?? '')),
+            'reviewStatus' => (string)($row['review_status'] ?? 'approved'),
+            'isOnline' => (bool)($row['is_online'] ?? true),
         ];
     }
     return $items;

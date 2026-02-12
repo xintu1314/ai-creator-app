@@ -21,7 +21,7 @@ echo "========================================\n\n";
 
 // 启动PHP内置服务器
 $command = sprintf(
-    'php -S %s:%d -t %s',
+    'php -d upload_max_filesize=256M -d post_max_size=256M -d max_file_uploads=20 -S %s:%d -t %s',
     $host,
     $port,
     $root

@@ -46,6 +46,7 @@ function oss_upload_file(string $tmpPath, string $objectKey, ?string $contentTyp
         if ($contentType) {
             $request->contentType = $contentType;
         }
+        $request->contentDisposition = 'inline';
 
         $client->putObject($request);
 

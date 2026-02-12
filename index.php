@@ -60,9 +60,17 @@ $pointsSummary = !empty($currentUser['id']) ? points_get_wallet_summary((int)$cu
                     <div class="flex-1 overflow-auto">
                         <?php include 'includes/assets.php'; ?>
                     </div>
+                <?php elseif ($activeTab === 'profile'): ?>
+                    <div class="flex-1 overflow-auto">
+                        <?php include 'includes/user_center.php'; ?>
+                    </div>
                 <?php elseif ($activeTab === 'publish'): ?>
                     <div class="flex-1 overflow-auto">
                         <?php include 'includes/publish.php'; ?>
+                    </div>
+                <?php elseif ($activeTab === 'admin'): ?>
+                    <div class="flex-1 overflow-auto">
+                        <?php include 'includes/admin.php'; ?>
                     </div>
                 <?php elseif ($activeTab === 'tutorial'): ?>
                     <div class="flex-1 overflow-auto">
