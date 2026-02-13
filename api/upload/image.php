@@ -11,10 +11,16 @@
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
+require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/oss.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Method not allowed', 405);
+    exit;
+}
+
+if (auth_get_current_user_id() <= 0) {
+    json_error('请先登录', 401);
     exit;
 }
 

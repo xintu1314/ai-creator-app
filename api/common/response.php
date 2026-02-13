@@ -27,3 +27,23 @@ function json_error($message = 'error', $code = 400) {
         'data' => null
     ], JSON_UNESCAPED_UNICODE);
 }
+
+function app_is_production(): bool {
+    $env = strtolower(trim((string)getenv('APP_ENV')));
+    return in_array($env, ['prod', 'production'], true);
+}
+
+function json_exception(string $publicMessage, Throwable $e, int $code = 500): void {
+    error_log($publicMessage . ' | ' . $e->getMessage());
+    json_error($publicMessage, $code);
+}
+
+function set_public_cache_headers(int $maxAgeSeconds, int $staleWhileRevalidateSeconds = 0): void {
+    $maxAge = max(0, $maxAgeSeconds);
+    $swr = max(0, $staleWhileRevalidateSeconds);
+    $cacheControl = 'public, max-age=' . $maxAge;
+    if ($swr > 0) {
+        $cacheControl .= ', stale-while-revalidate=' . $swr;
+    }
+    header('Cache-Control: ' . $cacheControl);
+}

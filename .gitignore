@@ -40,3 +40,6 @@ api/config/ai.local.php
 
 # 短信本地配置（含密钥时勿提交）
 api/config/sms.local.php
+
+# 支付本地配置（含密钥时勿提交）
+api/config/payment.local.php

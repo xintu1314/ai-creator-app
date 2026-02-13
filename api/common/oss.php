@@ -74,3 +74,84 @@ function oss_object_key(string $prefix, string $ext = 'jpg'): string {
     $uuid = bin2hex(random_bytes(8));
     return $prefix . '/' . $date . '/' . $uuid . '.' . $ext;
 }
+
+/**
+ * 将外部媒体文件转存到本项目 OSS，返回新的永久 URL。
+ * @param string $sourceUrl 外部媒体链接（仅支持 http/https）
+ * @param string $mediaType image|video
+ * @return string|null
+ */
+function oss_mirror_remote_media(string $sourceUrl, string $mediaType = 'image'): ?string {
+    $sourceUrl = trim($sourceUrl);
+    if ($sourceUrl === '') return null;
+
+    $parts = parse_url($sourceUrl);
+    $scheme = strtolower((string)($parts['scheme'] ?? ''));
+    if (!in_array($scheme, ['http', 'https'], true)) return null;
+
+    $tmpFile = tempnam(sys_get_temp_dir(), 'oss_mirror_');
+    if ($tmpFile === false) return null;
+
+    $fp = fopen($tmpFile, 'wb');
+    if (!$fp) {
+        @unlink($tmpFile);
+        return null;
+    }
+
+    $timeout = $mediaType === 'video' ? 120 : 45;
+    $ch = curl_init($sourceUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_FILE => $fp,
+        CURLOPT_HEADER => false,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $ok = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $contentType = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    $curlError = curl_error($ch);
+    @curl_close($ch);
+    fclose($fp);
+
+    if (!$ok || $httpCode < 200 || $httpCode >= 300) {
+        @unlink($tmpFile);
+        error_log('OSS mirror download failed: ' . ($curlError ?: ('HTTP ' . $httpCode)) . ' url=' . $sourceUrl);
+        return null;
+    }
+
+    $extMap = [
+        'image/jpeg' => 'jpg',
+        'image/jpg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/gif' => 'gif',
+        'video/mp4' => 'mp4',
+        'video/webm' => 'webm',
+        'video/quicktime' => 'mov',
+        'video/x-matroska' => 'mkv',
+    ];
+    $mime = strtolower(trim(explode(';', $contentType)[0] ?? ''));
+    $ext = $extMap[$mime] ?? '';
+    // 优先从 URL path 取扩展名（更可靠，尤其是视频带签名参数时）
+    if ($ext === '' || $mime === 'application/octet-stream' || $mime === 'binary/octet-stream') {
+        $path = (string)($parts['path'] ?? '');
+        $pathExt = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if ($pathExt !== '' && in_array($pathExt, ['jpg','jpeg','png','webp','gif','mp4','webm','mov','mkv'], true)) {
+            $ext = $pathExt;
+            // 同步修正 MIME
+            $mimeFixMap = ['jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','webp'=>'image/webp','gif'=>'image/gif','mp4'=>'video/mp4','webm'=>'video/webm','mov'=>'video/quicktime','mkv'=>'video/x-matroska'];
+            $mime = $mimeFixMap[$pathExt] ?? $mime;
+        }
+    }
+    if ($ext === '') {
+        $ext = $mediaType === 'video' ? 'mp4' : 'png';
+    }
+
+    $prefix = $mediaType === 'video' ? 'assets/videos/generated' : 'assets/images/generated';
+    $objectKey = oss_object_key($prefix, $ext);
+    $uploadedUrl = oss_upload_file($tmpFile, $objectKey, $mime ?: null);
+    @unlink($tmpFile);
+    return $uploadedUrl ?: null;
+}

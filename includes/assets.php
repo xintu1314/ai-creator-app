@@ -53,7 +53,7 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             <?php foreach ($filteredHistory as $item): ?>
                 <div class="group cursor-pointer bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
-                    <div class="relative aspect-[3/4] bg-[#F7F7F7]">
+                    <div class="relative aspect-[3/4] bg-[#F7F7F7] asset-media-wrap">
                         <?php if (($item['type'] ?? '') === 'video'): ?>
                             <video
                                 src="<?= htmlspecialchars($item['image']) ?>"
@@ -61,6 +61,7 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
                                 muted
                                 playsinline
                                 preload="metadata"
+                                onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div class=&quot;w-full h-full flex items-center justify-center text-xs text-[#999999]&quot;>视频资源已失效</div>');"
                             ></video>
                         <?php else: ?>
                             <img
@@ -68,6 +69,7 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
                                 alt="<?= htmlspecialchars($item['title']) ?>"
                                 class="w-full h-full object-cover"
                                 loading="lazy"
+                                onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div class=&quot;w-full h-full flex items-center justify-center text-xs text-[#999999]&quot;>图片资源已失效</div>');"
                             />
                         <?php endif; ?>
                         <div class="absolute top-2 left-2">

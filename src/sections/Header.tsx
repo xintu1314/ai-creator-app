@@ -1,4 +1,4 @@
-import { Zap, Diamond, Gift, Zap as ZapIcon, Bell, User } from 'lucide-react';
+import { Zap, Diamond, Zap as ZapIcon, Bell, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface HeaderProps {
@@ -25,15 +25,6 @@ export default function Header({ onInspirationClick }: HeaderProps) {
         >
           <Zap className="w-4 h-4" />
           灵感库
-        </button>
-
-        {/* 邀请有礼 */}
-        <button 
-          type="button"
-          className="h-9 px-3 text-sm bg-[#FFF4E6] hover:bg-[#FFE8CC] text-[#D97706] rounded-lg transition-colors flex items-center gap-1.5"
-        >
-          <Gift className="w-4 h-4" />
-          邀请有礼
         </button>
 
         {/* 充值 */}

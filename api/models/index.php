@@ -9,4 +9,5 @@ require_once __DIR__ . '/../data/models.php';
 
 $type = $_GET['type'] ?? 'image';
 $data = get_models($type);
+set_public_cache_headers(300, 60);
 json_success($data);

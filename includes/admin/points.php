@@ -37,6 +37,13 @@
 </div>
 
 <script>
+function adminPointsEsc(s) {
+    if (s == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(s);
+    return div.innerHTML;
+}
+
 async function adminPointsLoadLedger() {
     const userId = document.getElementById('admin-points-ledger-user-id')?.value?.trim() || '';
     const q = document.getElementById('admin-points-ledger-q')?.value?.trim() || '';
@@ -55,7 +62,7 @@ async function adminPointsLoadLedger() {
         const res = await fetch('api/admin/points/ledger.php?' + params.toString());
         const ret = await res.json();
         if (!ret.success) {
-            tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-red-500">' + (ret.message || '加载失败') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-red-500">' + adminPointsEsc(ret.message || '加载失败') + '</td></tr>';
             return;
         }
         const list = ret.data?.list || [];
@@ -69,15 +76,15 @@ async function adminPointsLoadLedger() {
             const name = item.user?.nickname || item.user?.account || ('用户' + item.userId);
             return `
                 <tr class="border-b border-[#F4F4F4]">
-                    <td class="py-2 pr-4 text-xs text-[#666666]">${(item.createdAt || '').replace('T', ' ').slice(0, 16)}</td>
+                    <td class="py-2 pr-4 text-xs text-[#666666]">${adminPointsEsc((item.createdAt || '').replace('T', ' ').slice(0, 16))}</td>
                     <td class="py-2 pr-4">
-                        <div class="text-[#1A1A1A]">#${item.userId} · ${name}</div>
-                        <div class="text-xs text-[#999999]">${item.user?.phone || ''}</div>
+                        <div class="text-[#1A1A1A]">#${adminPointsEsc(item.userId)} · ${adminPointsEsc(name)}</div>
+                        <div class="text-xs text-[#999999]">${adminPointsEsc(item.user?.phone || '')}</div>
                     </td>
                     <td class="py-2 pr-4 ${delta >= 0 ? 'text-emerald-600' : 'text-red-500'} font-medium">${delta >= 0 ? '+' + delta : delta}</td>
-                    <td class="py-2 pr-4">${item.balanceAfter}</td>
-                    <td class="py-2 pr-4 text-xs text-[#666666]">${item.source || ''}</td>
-                    <td class="py-2">${item.description || ''}</td>
+                    <td class="py-2 pr-4">${adminPointsEsc(item.balanceAfter)}</td>
+                    <td class="py-2 pr-4 text-xs text-[#666666]">${adminPointsEsc(item.source || '')}</td>
+                    <td class="py-2">${adminPointsEsc(item.description || '')}</td>
                 </tr>
             `;
         }).join('');

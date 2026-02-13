@@ -78,12 +78,21 @@ $filteredTemplates = $selectedCategory === '全部'
                     onclick="useTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>)"
                 >
                     <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-lg transition-all duration-300 aspect-[3/4]">
-                        <!-- Image -->
-                        <img
-                            src="<?= htmlspecialchars($template['image']) ?>"
-                            alt="<?= htmlspecialchars($template['title']) ?>"
-                            class="w-full h-full object-cover"
-                        />
+                        <?php if (($template['type'] ?? 'image') === 'video'): ?>
+                            <video
+                                src="<?= htmlspecialchars($template['image']) ?>"
+                                class="w-full h-full object-cover"
+                                muted
+                                playsinline
+                                preload="metadata"
+                            ></video>
+                        <?php else: ?>
+                            <img
+                                src="<?= htmlspecialchars($template['image']) ?>"
+                                alt="<?= htmlspecialchars($template['title']) ?>"
+                                class="w-full h-full object-cover"
+                            />
+                        <?php endif; ?>
                         
                         <!-- Model Tag -->
                         <div class="absolute top-1.5 left-1.5">

@@ -29,20 +29,44 @@
             灵感库
         </a>
 
-        <!-- 邀请有礼 -->
-        <button class="h-9 px-3 text-sm bg-[#FFF4E6] hover:bg-[#FFE8CC] text-[#D97706] rounded-lg transition-colors flex items-center gap-1.5">
-            <i data-lucide="gift" class="w-4 h-4"></i>
-            邀请有礼
-        </button>
-
         <!-- 积分 -->
-        <div class="flex items-center gap-2 px-3 h-9 rounded-lg bg-[#F8FAFF] border border-[#E6EEFF]" title="会员赠送积分每天12点重置">
+        <div class="flex items-center gap-2 px-3 h-9 rounded-lg bg-[#F8FAFF] border border-[#E6EEFF]" title="每日签到领积分，当天有效，次日12点清零">
             <i data-lucide="zap" class="w-4 h-4 text-[#3B82F6]"></i>
             <span id="header-points-balance" class="text-sm text-[#1A1A1A] font-medium"><?= (int)($pointsSummary['totalBalance'] ?? 0) ?></span>
             <button type="button" onclick="openPointsDialog()" class="text-sm text-[#3B82F6] hover:text-[#2563EB] transition-colors">
                 充值
             </button>
         </div>
+
+        <?php if (!empty($currentUser)): ?>
+        <button
+            type="button"
+            id="header-gen-status"
+            onclick="jumpToPendingGeneration()"
+            class="hidden h-9 px-3 text-sm rounded-lg transition-colors text-[#4F46E5] bg-[#EEF2FF] hover:bg-[#E0E7FF] border border-[#C7D2FE]"
+            title="查看进行中的生成任务"
+        >
+            生成中 0 / 已完成 0
+        </button>
+        <?php endif; ?>
+
+        <?php if (!empty($currentUser)): ?>
+        <?php
+            $headerCheckin = $pointsSummary['checkin'] ?? [];
+            $headerCheckedToday = !empty($headerCheckin['checkedToday']);
+            $headerCheckinReward = (int)($headerCheckin['rewardPoints'] ?? 16);
+        ?>
+        <button
+            type="button"
+            id="header-checkin-btn"
+            onclick="dailyCheckin()"
+            <?= $headerCheckedToday ? 'disabled' : '' ?>
+            class="h-9 px-3 text-sm rounded-lg transition-colors <?= $headerCheckedToday ? 'bg-[#F5F5F5] text-[#999999] cursor-not-allowed' : 'text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5]' ?>"
+            title="每日签到领积分，当天有效，次日12点清零"
+        >
+            <?= $headerCheckedToday ? '今日已签到' : ('每日签到 +' . $headerCheckinReward) ?>
+        </button>
+        <?php endif; ?>
 
         <div class="w-px h-6 bg-[#E5E5E5] mx-1"></div>
 
@@ -52,6 +76,16 @@
                 <i data-lucide="diamond" class="w-4 h-4 text-amber-500"></i>
                 会员中心
             </button>
+            <?php
+                $headerMembership = $pointsSummary['membership'] ?? null;
+                $headerMembershipActive = !empty($headerMembership) && (($headerMembership['status'] ?? '') === 'active');
+            ?>
+            <span
+                id="header-membership-status"
+                class="h-7 px-2.5 rounded-full text-xs flex items-center border <?= $headerMembershipActive ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-[#F5F5F5] text-[#666] border-[#E5E5E5]' ?>"
+            >
+                <?= $headerMembershipActive ? '会员中' : '普通用户' ?>
+            </span>
 
             <!-- 通知 -->
             <button class="relative h-9 w-9 flex items-center justify-center text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5] rounded-lg transition-colors">

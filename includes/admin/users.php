@@ -37,6 +37,13 @@
 </div>
 
 <script>
+function adminUsersEsc(s) {
+    if (s == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(s);
+    return div.innerHTML;
+}
+
 async function adminUsersLoad() {
     const q = document.getElementById('admin-users-q')?.value?.trim() || '';
     const status = document.getElementById('admin-users-status')?.value || '';
@@ -57,7 +64,7 @@ async function adminUsersLoad() {
         const res = await fetch('api/admin/users/list.php?' + params.toString());
         const ret = await res.json();
         if (!ret.success) {
-            tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-red-500">' + (ret.message || '加载失败') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-red-500">' + adminUsersEsc(ret.message || '加载失败') + '</td></tr>';
             return;
         }
         const list = ret.data?.list || [];
@@ -69,13 +76,13 @@ async function adminUsersLoad() {
         tbody.innerHTML = list.map((u) => {
             const name = u.nickname || u.account || ('用户' + u.id);
             const phone = u.phone || '-';
-            const roleOptions = ['user', 'admin'].map((r) => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r}</option>`).join('');
+            const roleOptions = ['user', 'admin'].map((r) => `<option value="${adminUsersEsc(r)}" ${u.role === r ? 'selected' : ''}>${adminUsersEsc(r)}</option>`).join('');
             const statusText = u.status || 'active';
             return `
                 <tr class="border-b border-[#F4F4F4]">
                     <td class="py-2 pr-4">
-                        <div class="font-medium text-[#1A1A1A]">${name}</div>
-                        <div class="text-xs text-[#999999]">#${u.id} · ${u.account} · ${phone}</div>
+                        <div class="font-medium text-[#1A1A1A]">${adminUsersEsc(name)}</div>
+                        <div class="text-xs text-[#999999]">#${adminUsersEsc(u.id)} · ${adminUsersEsc(u.account)} · ${adminUsersEsc(phone)}</div>
                     </td>
                     <td class="py-2 pr-4">
                         <select class="h-8 px-2 text-xs border border-[#E5E5E5] rounded" onchange="adminUserSetRole(${u.id}, this.value)">
@@ -83,11 +90,11 @@ async function adminUsersLoad() {
                         </select>
                     </td>
                     <td class="py-2 pr-4">
-                        <span class="px-2 py-0.5 text-xs rounded ${statusText === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${statusText}</span>
+                        <span class="px-2 py-0.5 text-xs rounded ${statusText === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${adminUsersEsc(statusText)}</span>
                     </td>
-                    <td class="py-2 pr-4">${u.wallet?.totalBalance ?? 0}（付费${u.wallet?.paidBalance ?? 0}/赠送${u.wallet?.bonusBalance ?? 0}）</td>
-                    <td class="py-2 pr-4">${u.taskCount || 0} / ${u.templateCount || 0}</td>
-                    <td class="py-2 pr-4 text-xs text-[#666666]">${(u.createdAt || '').replace('T', ' ').slice(0, 16)}</td>
+                    <td class="py-2 pr-4">${adminUsersEsc(u.wallet?.totalBalance ?? 0)}（付费${adminUsersEsc(u.wallet?.paidBalance ?? 0)}/赠送${adminUsersEsc(u.wallet?.bonusBalance ?? 0)}）</td>
+                    <td class="py-2 pr-4">${adminUsersEsc(u.taskCount || 0)} / ${adminUsersEsc(u.templateCount || 0)}</td>
+                    <td class="py-2 pr-4 text-xs text-[#666666]">${adminUsersEsc((u.createdAt || '').replace('T', ' ').slice(0, 16))}</td>
                     <td class="py-2">
                         <div class="flex flex-wrap gap-1">
                             <button class="h-7 px-2 text-xs rounded bg-[#F5F5F5] hover:bg-[#EDEDED]" onclick="adminUserToggleStatus(${u.id}, '${statusText}')">${statusText === 'active' ? '禁用' : '启用'}</button>

@@ -219,3 +219,12 @@ button:active {
 .gen-fade-in {
     animation: fadeInUp 0.4s ease;
 }
+
+/* Unified card corner style */
+.template-card > div,
+.gen-result-card,
+.gen-error-card,
+[class~="card"],
+[class*="card-"] {
+    border-radius: 16px;
+}

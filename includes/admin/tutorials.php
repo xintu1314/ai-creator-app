@@ -59,6 +59,12 @@
 
 <script>
 let adminTutorialsCache = [];
+function adminTutorialEsc(s) {
+    if (s == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(s);
+    return div.innerHTML;
+}
 
 function adminTutorialFillForm(t) {
     document.getElementById('admin-tutorial-id').value = t.id || '';
@@ -111,7 +117,7 @@ async function adminTutorialLoadList() {
         const res = await fetch('api/admin/tutorials/list.php?' + params.toString());
         const ret = await res.json();
         if (!ret.success) {
-            tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-red-500">' + (ret.message || '加载失败') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-red-500">' + adminTutorialEsc(ret.message || '加载失败') + '</td></tr>';
             return;
         }
         const list = ret.data?.list || [];
@@ -122,16 +128,16 @@ async function adminTutorialLoadList() {
         }
         tbody.innerHTML = list.map((t, i) => `
             <tr class="border-b border-[#F4F4F4]">
-                <td class="py-2 pr-4">#${t.id}</td>
+                <td class="py-2 pr-4">#${adminTutorialEsc(t.id)}</td>
                 <td class="py-2 pr-4">
-                    <div class="font-medium text-[#1A1A1A]">${t.title || ''}</div>
-                    <div class="text-xs text-[#999999] line-clamp-1">${t.videoUrl || ''}</div>
+                    <div class="font-medium text-[#1A1A1A]">${adminTutorialEsc(t.title || '')}</div>
+                    <div class="text-xs text-[#999999] line-clamp-1">${adminTutorialEsc(t.videoUrl || '')}</div>
                 </td>
                 <td class="py-2 pr-4">
                     <span class="px-2 py-0.5 text-xs rounded ${t.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'}">${t.isPublished ? '已发布' : '未发布'}</span>
                 </td>
-                <td class="py-2 pr-4">${t.sortOrder || 0}</td>
-                <td class="py-2 pr-4 text-xs text-[#666666]">${(t.updatedAt || t.createdAt || '').replace('T', ' ').slice(0, 16)}</td>
+                <td class="py-2 pr-4">${adminTutorialEsc(t.sortOrder || 0)}</td>
+                <td class="py-2 pr-4 text-xs text-[#666666]">${adminTutorialEsc((t.updatedAt || t.createdAt || '').replace('T', ' ').slice(0, 16))}</td>
                 <td class="py-2">
                     <div class="flex gap-1">
                         <button class="h-7 px-2 text-xs rounded bg-[#F5F5F5] hover:bg-[#EDEDED]" onclick="adminTutorialFillByIndex(${i})">编辑</button>

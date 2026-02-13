@@ -17,6 +17,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $raw = file_get_contents('php://input');
 $input = json_decode($raw, true) ?? [];
 
+$is_allowed_media_url = static function ($url): bool {
+    if (!is_string($url)) return false;
+    $url = trim($url);
+    if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) return false;
+    $parts = parse_url($url);
+    $scheme = strtolower((string)($parts['scheme'] ?? ''));
+    $host = strtolower((string)($parts['host'] ?? ''));
+    if ($scheme !== 'https' || $host === '') return false;
+    if ($host === 'localhost' || $host === '127.0.0.1' || $host === '::1') return false;
+    if (preg_match('/^\d+\.\d+\.\d+\.\d+$/', $host) === 1) {
+        // Block direct IPv4 to avoid private/internal address probing.
+        return false;
+    }
+    return true;
+};
+
 $prompt = trim($input['prompt'] ?? '');
 if (empty($prompt)) {
     json_error('请输入提示词');
@@ -41,12 +57,24 @@ $params = [
     'duration' => $input['duration'] ?? 5,
 ];
 if (!empty($input['referenceImageUrls']) && is_array($input['referenceImageUrls'])) {
-    $params['referenceImageUrls'] = array_values(array_filter($input['referenceImageUrls'], 'is_string'));
+    $params['referenceImageUrls'] = array_values(array_filter($input['referenceImageUrls'], $is_allowed_media_url));
+    if (count($params['referenceImageUrls']) !== count($input['referenceImageUrls'])) {
+        json_error('参考图地址不合法，仅支持 HTTPS 公网地址');
+        exit;
+    }
 }
 if (!empty($input['firstFrameUrl'])) {
+    if (!$is_allowed_media_url($input['firstFrameUrl'])) {
+        json_error('首帧地址不合法，仅支持 HTTPS 公网地址');
+        exit;
+    }
     $params['firstFrameUrl'] = $input['firstFrameUrl'];
 }
 if (!empty($input['lastFrameUrl'])) {
+    if (!$is_allowed_media_url($input['lastFrameUrl'])) {
+        json_error('尾帧地址不合法，仅支持 HTTPS 公网地址');
+        exit;
+    }
     $params['lastFrameUrl'] = $input['lastFrameUrl'];
 }
 
@@ -274,5 +302,5 @@ try {
         json_error('不支持的模型：' . $model);
     }
 } catch (Throwable $e) {
-    json_error('任务创建失败：' . $e->getMessage(), 500);
+    json_exception('任务创建失败，请稍后重试', $e, 500);
 }

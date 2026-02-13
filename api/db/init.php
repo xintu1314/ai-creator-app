@@ -31,6 +31,32 @@ CREATE TABLE IF NOT EXISTS sms_verification_codes (
 $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sms_phone_created ON sms_verification_codes(phone, created_at DESC)");
 $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sms_phone_purpose_status ON sms_verification_codes(phone, purpose, status)");
 
+// 轻量迁移：支付订单表（兼容旧库）
+$pdo->exec("
+CREATE TABLE IF NOT EXISTS payment_orders (
+    id BIGSERIAL PRIMARY KEY,
+    out_trade_no VARCHAR(64) NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    order_type VARCHAR(20) NOT NULL CHECK (order_type IN ('recharge', 'membership')),
+    biz_id VARCHAR(64) NOT NULL,
+    subject VARCHAR(120) NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL,
+    points_amount INTEGER NOT NULL DEFAULT 0,
+    membership_days INTEGER NOT NULL DEFAULT 0,
+    pay_param VARCHAR(255) DEFAULT '',
+    pay_type VARCHAR(20) DEFAULT '',
+    trade_no VARCHAR(64) DEFAULT '',
+    status VARCHAR(20) NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'paid', 'processing', 'done', 'failed')),
+    callback_raw JSONB,
+    paid_at TIMESTAMP,
+    fulfilled_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)
+");
+$pdo->exec("CREATE INDEX IF NOT EXISTS idx_payment_orders_user_created ON payment_orders(user_id, created_at DESC)");
+$pdo->exec("CREATE INDEX IF NOT EXISTS idx_payment_orders_status_created ON payment_orders(status, created_at DESC)");
+
 // 检查 assets 是否为空，空则导入 seed
 $count = $pdo->query("SELECT COUNT(*) FROM assets")->fetchColumn();
 if ($count == 0) {

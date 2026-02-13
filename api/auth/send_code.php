@@ -27,6 +27,7 @@ $cfg = sms_config();
 $ttl = max(60, (int)($cfg['code_ttl_seconds'] ?? 300));
 $cooldown = max(30, (int)($cfg['send_cooldown_seconds'] ?? 60));
 $dailyLimit = max(1, (int)($cfg['daily_limit_per_phone'] ?? 20));
+$debugReturnCode = !app_is_production() && !empty($cfg['debug_return_code']);
 
 try {
     $pdo = get_db();
@@ -97,7 +98,7 @@ try {
     $sendRet = sms_send_aliyun($phone, (string)($cfg['template_code_login'] ?? ''), ['code' => $code]);
     if (!$sendRet['success']) {
         // 调试模式：允许不通短信网关时直接下发（仅返回code便于联调）
-        if (!empty($cfg['debug_return_code'])) {
+        if ($debugReturnCode) {
             $pdo->commit();
             json_success([
                 'phone' => $phone,
@@ -122,6 +123,6 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    json_error('发送失败：' . $e->getMessage(), 500);
+    json_exception('发送失败，请稍后重试', $e, 500);
 }
 

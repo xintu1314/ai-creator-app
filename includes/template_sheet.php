@@ -3,7 +3,7 @@
 ?>
 <!-- Template Sheet - Half Screen -->
 <div id="template-sheet" class="hidden fixed inset-x-0 bottom-0 z-50" onclick="closeTemplateSheet()" style="display: none;">
-    <div class="bg-white rounded-t-2xl shadow-2xl h-[60vh] max-h-[60vh] flex flex-col" onclick="event.stopPropagation()">
+    <div class="w-full bg-white rounded-t-2xl shadow-2xl h-[60vh] max-h-[60vh] flex flex-col" onclick="event.stopPropagation()">
         <!-- Header -->
         <div class="px-6 py-4 border-b border-[#E5E5E5] flex flex-col flex-shrink-0">
             <div class="flex items-center justify-between mb-4">
@@ -47,12 +47,21 @@
                         onclick="useTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>); closeTemplateSheet();"
                     >
                         <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-lg transition-all duration-300 aspect-[3/4]">
-                            <!-- Image -->
-                            <img
-                                src="<?= htmlspecialchars($template['image']) ?>"
-                                alt="<?= htmlspecialchars($template['title']) ?>"
-                                class="w-full h-full object-cover"
-                            />
+                            <?php if (($template['type'] ?? 'image') === 'video'): ?>
+                                <video
+                                    src="<?= htmlspecialchars($template['image']) ?>"
+                                    class="w-full h-full object-cover"
+                                    muted
+                                    playsinline
+                                    preload="metadata"
+                                ></video>
+                            <?php else: ?>
+                                <img
+                                    src="<?= htmlspecialchars($template['image']) ?>"
+                                    alt="<?= htmlspecialchars($template['title']) ?>"
+                                    class="w-full h-full object-cover"
+                                />
+                            <?php endif; ?>
                             
                             <!-- Model Tag -->
                             <div class="absolute top-1.5 left-1.5">

@@ -31,8 +31,8 @@ $pointsSummary = !empty($currentUser['id']) ? points_get_wallet_summary((int)$cu
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI创作平台</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS build output -->
+    <link rel="stylesheet" href="assets/css/tailwind.css">
     <!-- 自定义样式 -->
     <link rel="stylesheet" href="assets/css/style.css">
     <!-- Lucide Icons CDN -->
@@ -90,6 +90,7 @@ $pointsSummary = !empty($currentUser['id']) ? points_get_wallet_summary((int)$cu
         window.currentUser = <?= json_encode($currentUser, JSON_UNESCAPED_UNICODE) ?>;
         window.pointsSummary = <?= json_encode($pointsSummary, JSON_UNESCAPED_UNICODE) ?>;
         window.pointsPricingImage = <?= json_encode((points_get_pricing_config()['image_cost_points'] ?? []), JSON_UNESCAPED_UNICODE) ?>;
+        window.pointsPricingVideo = <?= json_encode((points_get_pricing_config()['video_cost_points'] ?? []), JSON_UNESCAPED_UNICODE) ?>;
 
         // 确保页面加载完成后初始化
         window.addEventListener('load', function() {

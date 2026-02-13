@@ -90,6 +90,31 @@ CREATE TABLE IF NOT EXISTS points_ledger (
 
 CREATE INDEX IF NOT EXISTS idx_points_ledger_user_created ON points_ledger(user_id, created_at DESC);
 
+-- 支付订单（易支付）
+CREATE TABLE IF NOT EXISTS payment_orders (
+    id BIGSERIAL PRIMARY KEY,
+    out_trade_no VARCHAR(64) NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    order_type VARCHAR(20) NOT NULL CHECK (order_type IN ('recharge', 'membership')),
+    biz_id VARCHAR(64) NOT NULL,
+    subject VARCHAR(120) NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL,
+    points_amount INTEGER NOT NULL DEFAULT 0,
+    membership_days INTEGER NOT NULL DEFAULT 0,
+    pay_param VARCHAR(255) DEFAULT '',
+    pay_type VARCHAR(20) DEFAULT '',
+    trade_no VARCHAR(64) DEFAULT '',
+    status VARCHAR(20) NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'paid', 'processing', 'done', 'failed')),
+    callback_raw JSONB,
+    paid_at TIMESTAMP,
+    fulfilled_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_orders_user_created ON payment_orders(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payment_orders_status_created ON payment_orders(status, created_at DESC);
+
 -- 会员状态（单用户一条）
 CREATE TABLE IF NOT EXISTS user_memberships (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

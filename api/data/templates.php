@@ -4,7 +4,7 @@
  */
 require_once __DIR__ . '/../common/db.php';
 
-const TEMPLATE_PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1557658017-ecd0d1e3f9c5?w=400&h=500&fit=crop';
+const TEMPLATE_PLACEHOLDER_IMAGE = '/assets/images/template-placeholder.svg';
 
 function get_templates($type = 'image') {
     try {

@@ -41,6 +41,25 @@
 </div>
 
 <script>
+function adminEsc(s) {
+    if (s == null) return '';
+    const div = document.createElement('div');
+    div.textContent = String(s);
+    return div.innerHTML;
+}
+
+function adminSafeMediaUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return '';
+    try {
+        const parsed = new URL(raw, window.location.origin);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+        return parsed.href;
+    } catch (e) {
+        return '';
+    }
+}
+
 async function adminTemplatesLoad() {
     const type = document.getElementById('admin-templates-type')?.value || '';
     const reviewStatus = document.getElementById('admin-templates-review')?.value || '';
@@ -61,7 +80,7 @@ async function adminTemplatesLoad() {
         const res = await fetch('api/admin/templates/list.php?' + params.toString());
         const ret = await res.json();
         if (!ret.success) {
-            tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-red-500">' + (ret.message || '加载失败') + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-red-500">' + adminEsc(ret.message || '加载失败') + '</td></tr>';
             return;
         }
         const list = ret.data?.list || [];
@@ -73,21 +92,28 @@ async function adminTemplatesLoad() {
             const author = t.author?.nickname || t.author?.account || ('用户' + t.userId);
             const review = t.reviewStatus || 'approved';
             const reviewClass = review === 'approved' ? 'bg-green-100 text-green-700' : (review === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700');
+            const safeImage = adminSafeMediaUrl(t.image);
+            const isVideo = String(t.type || '') === 'video' || /\.(mp4|webm|mov|avi|mpeg)(\?|$)/i.test(safeImage || '');
+            const mediaHtml = !safeImage
+                ? '<div class="w-10 h-12 rounded bg-[#F3F4F6]"></div>'
+                : (isVideo
+                    ? `<video src="${safeImage}" class="w-10 h-12 rounded object-cover border border-[#EEE]" muted playsinline preload="metadata"></video>`
+                    : `<img src="${safeImage}" alt="" class="w-10 h-12 rounded object-cover border border-[#EEE]" />`);
             return `
                 <tr class="border-b border-[#F4F4F4]">
                     <td class="py-2 pr-4">
                         <div class="flex items-center gap-2">
-                            ${t.image ? `<img src="${t.image}" alt="" class="w-10 h-12 rounded object-cover border border-[#EEE]" />` : '<div class="w-10 h-12 rounded bg-[#F3F4F6]"></div>'}
+                            ${mediaHtml}
                             <div>
-                                <div class="font-medium text-[#1A1A1A] line-clamp-1">${t.title || ''}</div>
-                                <div class="text-xs text-[#999999]">#${t.id} · ${t.type} · ${t.modelName || t.modelId || ''}</div>
+                                <div class="font-medium text-[#1A1A1A] line-clamp-1">${adminEsc(t.title || '')}</div>
+                                <div class="text-xs text-[#999999]">#${adminEsc(t.id)} · ${adminEsc(t.type)} · ${adminEsc(t.modelName || t.modelId || '')}</div>
                             </div>
                         </div>
                     </td>
-                    <td class="py-2 pr-4 text-xs text-[#666666]">${author}<br/>${t.author?.phone || ''}</td>
-                    <td class="py-2 pr-4"><span class="px-2 py-0.5 text-xs rounded ${reviewClass}">${review}</span></td>
+                    <td class="py-2 pr-4 text-xs text-[#666666]">${adminEsc(author)}<br/>${adminEsc(t.author?.phone || '')}</td>
+                    <td class="py-2 pr-4"><span class="px-2 py-0.5 text-xs rounded ${reviewClass}">${adminEsc(review)}</span></td>
                     <td class="py-2 pr-4">${t.isOnline ? '在线' : '下线'}</td>
-                    <td class="py-2 pr-4 text-xs text-[#666666]">${(t.createdAt || '').replace('T', ' ').slice(0, 16)}</td>
+                    <td class="py-2 pr-4 text-xs text-[#666666]">${adminEsc((t.createdAt || '').replace('T', ' ').slice(0, 16))}</td>
                     <td class="py-2">
                         <div class="flex flex-wrap gap-1">
                             <button class="h-7 px-2 text-xs rounded bg-[#ECFDF5] text-[#166534] hover:bg-[#D1FAE5]" onclick="adminTemplateSetReview(${t.id}, 'approved')">通过</button>

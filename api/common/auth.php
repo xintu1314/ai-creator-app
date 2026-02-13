@@ -60,6 +60,7 @@ function auth_get_current_user_id(): int {
 function auth_login(array $user): void {
     auth_ensure_user_admin_columns();
     auth_boot_session();
+    session_regenerate_id(true);
     $_SESSION['user'] = [
         'id' => (int)$user['id'],
         'account' => (string)($user['account'] ?? ''),

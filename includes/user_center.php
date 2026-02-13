@@ -77,11 +77,28 @@ if ($currentUserId > 0) {
             <div class="bg-white rounded-xl p-5 border border-[#E5E5E5]">
                 <div class="text-sm text-[#666666] mb-2">积分总览</div>
                 <div class="text-3xl font-semibold text-[#1A1A1A] mb-3"><?= (int)($pointsSummary['totalBalance'] ?? 0) ?></div>
+                <?php
+                    $checkin = $pointsSummary['checkin'] ?? [];
+                    $checkedToday = !empty($checkin['checkedToday']);
+                    $checkinReward = (int)($checkin['rewardPoints'] ?? 16);
+                ?>
                 <div class="space-y-1 text-sm">
                     <div class="text-[#666666]">付费积分：<span class="text-[#1A1A1A] font-medium"><?= (int)($pointsSummary['paidBalance'] ?? 0) ?></span></div>
                     <div class="text-[#666666]">赠送积分：<span class="text-[#1A1A1A] font-medium"><?= (int)($pointsSummary['bonusBalance'] ?? 0) ?></span></div>
                 </div>
+                <div class="mt-3 text-xs text-[#666666]" id="user-center-checkin-tip">
+                    <?= $checkedToday ? '今日已签到，赠送积分当天有效，次日 12:00 清零' : ('今日未签到，签到可领 ' . $checkinReward . ' 积分（当天有效）') ?>
+                </div>
                 <div class="mt-4 flex gap-2">
+                    <button
+                        type="button"
+                        id="user-center-checkin-btn"
+                        onclick="dailyCheckin()"
+                        <?= $checkedToday ? 'disabled' : '' ?>
+                        class="h-9 px-3 text-sm <?= $checkedToday ? 'bg-[#F5F5F5] text-[#999999] cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white' ?> rounded-lg transition-colors"
+                    >
+                        <?= $checkedToday ? '今日已签到' : '每日签到' ?>
+                    </button>
                     <button type="button" onclick="openPointsDialog()" class="h-9 px-3 text-sm bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors">充值积分</button>
                     <button type="button" onclick="openMembershipDialog()" class="h-9 px-3 text-sm bg-[#F5F5F5] hover:bg-[#EDEDED] text-[#1A1A1A] rounded-lg transition-colors">会员中心</button>
                 </div>
@@ -94,16 +111,19 @@ if ($currentUserId > 0) {
                     <h2 class="text-base font-medium text-[#1A1A1A]">会员状态</h2>
                     <button type="button" onclick="openMembershipDialog()" class="text-sm text-[#3B82F6] hover:text-[#2563EB]">管理</button>
                 </div>
-                <?php $membership = $pointsSummary['membership'] ?? null; ?>
-                <?php if (!empty($membership)): ?>
+                <?php
+                    $membership = $pointsSummary['membership'] ?? null;
+                    $membershipActive = !empty($membership) && (($membership['status'] ?? '') === 'active');
+                ?>
+                <?php if ($membershipActive): ?>
                     <div class="text-sm text-[#666666] space-y-1">
                         <div>套餐：<span class="text-[#1A1A1A] font-medium"><?= htmlspecialchars((string)($membership['planCode'] ?? '-')) ?></span></div>
-                        <div>每日赠送：<span class="text-[#1A1A1A] font-medium"><?= (int)($membership['dailyBonusPoints'] ?? 0) ?> 分</span></div>
+                        <div>每日签到奖励：<span class="text-[#1A1A1A] font-medium"><?= (int)($membership['dailyBonusPoints'] ?? 0) ?> 分</span></div>
                         <div>到期时间：<span class="text-[#1A1A1A] font-medium"><?= htmlspecialchars((string)($membership['expiresAt'] ?? '-')) ?></span></div>
                         <div>状态：<span class="text-[#1A1A1A] font-medium"><?= htmlspecialchars((string)($membership['status'] ?? '-')) ?></span></div>
                     </div>
                 <?php else: ?>
-                    <p class="text-sm text-[#666666]">你当前还不是会员，开通后每天可获赠积分。</p>
+                    <p class="text-sm text-[#666666]">你当前还不是会员；可通过每日签到领取积分。</p>
                 <?php endif; ?>
             </div>
 
@@ -167,7 +187,11 @@ if ($currentUserId > 0) {
                     <div class="grid grid-cols-3 gap-2">
                         <?php foreach ($myTemplates as $tpl): ?>
                             <div class="rounded-lg overflow-hidden border border-[#EFEFEF] bg-[#FAFAFA]">
-                                <img src="<?= htmlspecialchars((string)($tpl['image'] ?? '')) ?>" alt="<?= htmlspecialchars((string)($tpl['title'] ?? '')) ?>" class="w-full aspect-[3/4] object-cover" loading="lazy" />
+                                <?php if (($tpl['type'] ?? 'image') === 'video'): ?>
+                                    <video src="<?= htmlspecialchars((string)($tpl['image'] ?? '')) ?>" class="w-full aspect-[3/4] object-cover" muted playsinline preload="metadata"></video>
+                                <?php else: ?>
+                                    <img src="<?= htmlspecialchars((string)($tpl['image'] ?? '')) ?>" alt="<?= htmlspecialchars((string)($tpl['title'] ?? '')) ?>" class="w-full aspect-[3/4] object-cover" loading="lazy" />
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>

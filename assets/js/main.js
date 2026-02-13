@@ -216,6 +216,7 @@ function openMembershipDialog() {
     }
     const dialog = document.getElementById('membership-dialog');
     if (!dialog) return;
+    syncMembershipDialogState(window.pointsSummary || null);
     dialog.classList.remove('hidden');
     dialog.style.display = 'flex';
 }
@@ -227,57 +228,403 @@ function closeMembershipDialog() {
     dialog.style.display = 'none';
 }
 
+let inlinePayOrderNo = '';
+let inlinePayTimer = null;
+let inlinePayDoneShown = false;
+let inlinePayActionPending = false;
+let inlinePayTitle = '';
+
+function formatPaymentErrorHint(msg, statusCode) {
+    const text = String(msg || '');
+    if (text.includes('支付配置缺失') || text.includes('创建支付订单失败') || Number(statusCode) >= 500) {
+        return '支付暂不可用，请联系管理员检查支付配置（EPAY_API_BASE / EPAY_PID / EPAY_KEY）。';
+    }
+    return text || '支付请求失败，请稍后重试';
+}
+
+async function dailyCheckin() {
+    const btn = document.getElementById('user-center-checkin-btn');
+    const tip = document.getElementById('user-center-checkin-tip');
+    if (btn && btn.disabled) return;
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '签到中...';
+        btn.classList.add('opacity-70', 'cursor-not-allowed');
+    }
+    try {
+        const res = await fetch('api/points/checkin.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            showInlineNotice(data.message || '签到失败', 'error');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '每日签到';
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+            return;
+        }
+        showInlineNotice(data.message || '签到成功', 'success');
+        await refreshPointsSummary();
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '今日已签到';
+            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'text-white');
+            btn.classList.add('bg-[#F5F5F5]', 'text-[#999999]', 'cursor-not-allowed');
+        }
+        if (tip) {
+            const reward = data.data?.wallet?.checkin?.rewardPoints ?? 16;
+            tip.textContent = `今日已签到，已领取 ${reward} 积分（当天有效，次日 12:00 清零）`;
+        }
+    } catch (err) {
+        showInlineNotice('网络异常，签到失败', 'error');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '每日签到';
+            btn.classList.remove('opacity-70', 'cursor-not-allowed');
+        }
+    }
+}
+
+function showInlineNotice(message, type = 'info') {
+    const text = String(message || '').trim();
+    if (!text) return;
+    let box = document.getElementById('inline-global-notice');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'inline-global-notice';
+        box.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 rounded-lg text-sm shadow-lg';
+        document.body.appendChild(box);
+    }
+    if (type === 'success') {
+        box.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 rounded-lg text-sm shadow-lg bg-emerald-50 text-emerald-700 border border-emerald-200';
+    } else if (type === 'error') {
+        box.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 rounded-lg text-sm shadow-lg bg-red-50 text-red-700 border border-red-200';
+    } else {
+        box.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 rounded-lg text-sm shadow-lg bg-slate-50 text-slate-700 border border-slate-200';
+    }
+    box.textContent = text;
+    clearTimeout(window.__inlineNoticeTimer);
+    window.__inlineNoticeTimer = setTimeout(() => {
+        if (box) box.remove();
+    }, 2600);
+}
+
+if (!window.__nativeAlertPatched) {
+    window.__nativeAlertPatched = true;
+    if (typeof window.alert === 'function') {
+        window.__nativeAlertOriginal = window.alert.bind(window);
+    }
+    window.alert = function (message) {
+        showInlineNotice(String(message || ''), 'info');
+    };
+}
+
+function syncCheckinButtons(wallet) {
+    const checkedToday = !!(wallet?.checkin && wallet.checkin.checkedToday);
+    const reward = wallet?.checkin?.rewardPoints ?? 16;
+    const checkinBtn = document.getElementById('user-center-checkin-btn');
+    const checkinTip = document.getElementById('user-center-checkin-tip');
+    const headerCheckinBtn = document.getElementById('header-checkin-btn');
+
+    if (checkinBtn) {
+        if (checkedToday) {
+            checkinBtn.disabled = true;
+            checkinBtn.textContent = '今日已签到';
+            checkinBtn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700', 'text-white');
+            checkinBtn.classList.add('bg-[#F5F5F5]', 'text-[#999999]', 'cursor-not-allowed');
+        } else {
+            checkinBtn.disabled = false;
+            checkinBtn.textContent = '每日签到';
+            checkinBtn.classList.remove('bg-[#F5F5F5]', 'text-[#999999]', 'cursor-not-allowed');
+            checkinBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700', 'text-white');
+        }
+    }
+
+    if (checkinTip) {
+        checkinTip.textContent = checkedToday
+            ? '今日已签到，赠送积分当天有效，次日 12:00 清零'
+            : `今日未签到，签到可领 ${reward} 积分（当天有效）`;
+    }
+
+    if (headerCheckinBtn) {
+        if (checkedToday) {
+            headerCheckinBtn.disabled = true;
+            headerCheckinBtn.textContent = '今日已签到';
+            headerCheckinBtn.className = 'h-9 px-3 text-sm rounded-lg transition-colors bg-[#F5F5F5] text-[#999999] cursor-not-allowed';
+        } else {
+            headerCheckinBtn.disabled = false;
+            headerCheckinBtn.textContent = `每日签到 +${reward}`;
+            headerCheckinBtn.className = 'h-9 px-3 text-sm rounded-lg transition-colors text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5]';
+        }
+    }
+}
+
+function syncMembershipDialogState(wallet) {
+    const membership = wallet?.membership || null;
+    const activePlan = membership && membership.status === 'active' ? String(membership.planCode || '') : '';
+    const planLabelMap = {
+        member_first_month: '首月会员',
+        member_renew_month: '连续续费月会员',
+        member_single_month: '单月会员',
+        member_year: '年会员',
+    };
+    const tipEl = document.getElementById('membership-current-tip');
+    if (tipEl) {
+        if (activePlan) {
+            tipEl.className = 'mb-4 text-sm rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 px-4 py-2.5';
+            const planLabel = planLabelMap[activePlan] || activePlan;
+            tipEl.textContent = `当前会员：${planLabel}，到期时间：${membership.expiresAt || '-'}；每日签到可领 ${membership.dailyBonusPoints || 16} 积分`;
+        } else {
+            tipEl.className = 'mb-4 text-sm rounded-xl border border-[#E5E5E5] bg-[#F8FAFC] text-[#475569] px-4 py-2.5';
+            tipEl.textContent = '当前状态：普通用户；可通过每日签到领取积分，也可按需选择会员套餐。';
+        }
+    }
+
+    const planIds = ['member_first_month', 'member_renew_month', 'member_single_month', 'member_year'];
+    planIds.forEach(function (planId) {
+        const card = document.getElementById('membership-card-' + planId);
+        const btn = document.getElementById('membership-btn-' + planId);
+        const isActive = activePlan === planId;
+        if (card) {
+            if (isActive) {
+                card.classList.add('ring-2', 'ring-emerald-400', 'border-emerald-300');
+            } else {
+                card.classList.remove('ring-2', 'ring-emerald-400', 'border-emerald-300');
+            }
+        }
+        if (btn) {
+            if (isActive) {
+                btn.disabled = true;
+                btn.textContent = '当前生效中';
+                btn.classList.add('opacity-70', 'cursor-not-allowed');
+            } else {
+                btn.disabled = false;
+                btn.textContent = '立即开通';
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }
+    });
+}
+
+function closeInlinePayDialog() {
+    const dialog = document.getElementById('inline-pay-dialog');
+    if (!dialog) return;
+    dialog.classList.add('hidden');
+    dialog.style.display = 'none';
+    if (inlinePayTimer) {
+        clearInterval(inlinePayTimer);
+        inlinePayTimer = null;
+    }
+    inlinePayOrderNo = '';
+    inlinePayTitle = '';
+    inlinePayDoneShown = false;
+}
+
+function openInlinePayDialog(payload) {
+    const dialog = document.getElementById('inline-pay-dialog');
+    if (!dialog) return;
+
+    inlinePayOrderNo = payload?.outTradeNo || '';
+    inlinePayTitle = String(payload?.title || '');
+    const imgUrl = payload?.payInfo?.img || '';
+    const qrcodeUrl = payload?.payInfo?.qrcode || '';
+    const payUrl = payload?.payInfo?.payUrl || qrcodeUrl || '';
+    const amount = payload?.amount || '';
+    const title = payload?.title || '订单支付';
+
+    const descEl = document.getElementById('inline-pay-desc');
+    const imgEl = document.getElementById('inline-pay-img');
+    const linkEl = document.getElementById('inline-pay-open-link');
+    const statusEl = document.getElementById('inline-pay-status');
+
+    if (descEl) {
+        descEl.textContent = `${title}${amount ? `（${amount}元）` : ''}，请扫码支付`;
+    }
+    if (imgEl) {
+        const source = imgUrl || qrcodeUrl || '';
+        if (source) {
+            imgEl.src = source;
+            imgEl.classList.remove('hidden');
+        } else {
+            imgEl.classList.add('hidden');
+            imgEl.src = '';
+        }
+    }
+    if (linkEl) {
+        if (payUrl) {
+            linkEl.href = payUrl;
+            linkEl.classList.remove('hidden');
+        } else {
+            linkEl.classList.add('hidden');
+        }
+    }
+    if (statusEl) {
+        statusEl.textContent = '等待支付中...';
+        statusEl.classList.remove('text-emerald-600');
+        statusEl.classList.add('text-[#999]');
+    }
+    inlinePayDoneShown = false;
+
+    dialog.classList.remove('hidden');
+    dialog.style.display = 'flex';
+
+    if (inlinePayTimer) clearInterval(inlinePayTimer);
+    inlinePayTimer = setInterval(function () {
+        checkInlinePayStatus(false);
+    }, 3000);
+}
+
+async function checkInlinePayStatus(showMsg = true) {
+    if (!inlinePayOrderNo) return;
+    const statusEl = document.getElementById('inline-pay-status');
+    try {
+        const res = await fetch('api/payment/status.php?outTradeNo=' + encodeURIComponent(inlinePayOrderNo));
+        const data = await res.json();
+        if (!data.success) {
+            if (showMsg) showInlineNotice(data.message || '查询支付状态失败', 'error');
+            return;
+        }
+        if (data.data?.done) {
+            if (statusEl) {
+                statusEl.textContent = '支付成功，权益已到账';
+                statusEl.classList.remove('text-[#999]');
+                statusEl.classList.add('text-emerald-600');
+            }
+            if (inlinePayTimer) {
+                clearInterval(inlinePayTimer);
+                inlinePayTimer = null;
+            }
+            await refreshPointsSummary();
+            if (!inlinePayDoneShown) {
+                inlinePayDoneShown = true;
+                const doneMsg = inlinePayTitle.includes('会员')
+                    ? '支付成功，会员状态已自动刷新'
+                    : '支付成功，积分余额已自动刷新';
+                showInlineNotice(doneMsg, 'success');
+            }
+            setTimeout(function () {
+                closeInlinePayDialog();
+            }, 2000);
+            return;
+        }
+        if (statusEl) statusEl.textContent = '等待支付中...';
+        if (showMsg) showInlineNotice('尚未支付成功，请完成支付后再刷新', 'info');
+    } catch (err) {
+        if (showMsg) showInlineNotice('网络异常，查询失败', 'error');
+    }
+}
+
 async function refreshPointsSummary() {
     if (!window.currentUser || !window.currentUser.id) return;
     try {
         const res = await fetch('api/points/me.php');
         const data = await res.json();
         if (!data.success || !data.data?.wallet) return;
-        window.pointsSummary = data.data.wallet;
-        const el = document.getElementById('header-points-balance');
-        if (el) el.textContent = String(data.data.wallet.totalBalance || 0);
+        applyWalletSummary(data.data.wallet);
     } catch (err) {
         // ignore
     }
 }
 
+function applyWalletSummary(wallet) {
+    if (!wallet) return;
+    window.pointsSummary = wallet;
+    const el = document.getElementById('header-points-balance');
+    if (el) el.textContent = String(wallet.totalBalance || 0);
+    const memberStatusEl = document.getElementById('header-membership-status');
+    if (memberStatusEl) {
+        const isActiveMember = !!(wallet.membership && wallet.membership.status === 'active');
+        memberStatusEl.textContent = isActiveMember ? '会员中' : '普通用户';
+        memberStatusEl.className = isActiveMember
+            ? 'h-7 px-2.5 rounded-full text-xs flex items-center border bg-amber-50 text-amber-700 border-amber-200'
+            : 'h-7 px-2.5 rounded-full text-xs flex items-center border bg-[#F5F5F5] text-[#666] border-[#E5E5E5]';
+    }
+    syncMembershipDialogState(wallet);
+    syncCheckinButtons(wallet);
+}
+
 async function rechargePoints(packageId) {
+    if (inlinePayActionPending) return;
+    inlinePayActionPending = true;
     try {
         const res = await fetch('api/points/recharge.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ packageId }),
+            body: JSON.stringify({ packageId, payType: 'alipay' }),
         });
-        const data = await res.json();
-        if (!data.success) {
-            alert(data.message || '充值失败');
+        const raw = await res.text();
+        let data = null;
+        try { data = JSON.parse(raw); } catch (e) { /* ignore */ }
+        if (!data) {
+            alert('服务端返回异常：' + raw.slice(0, 120));
             return;
         }
-        closePointsDialog();
-        await refreshPointsSummary();
-        alert('充值成功，积分已到账');
+        if (!data.success) {
+            alert(formatPaymentErrorHint(data.message, res.status));
+            return;
+        }
+        if (!data.data?.payInfo) {
+            alert('创建支付信息失败，请稍后重试');
+            return;
+        }
+        openInlinePayDialog({
+            title: '积分充值',
+            amount: data.data?.package?.price,
+            outTradeNo: data.data?.outTradeNo,
+            payInfo: data.data?.payInfo,
+        });
     } catch (err) {
         alert('网络异常，充值失败');
+    } finally {
+        inlinePayActionPending = false;
     }
 }
 
 async function subscribeMembership(planId) {
+    if (inlinePayActionPending) return;
+    inlinePayActionPending = true;
     try {
+        const activePlan = window.pointsSummary?.membership?.status === 'active'
+            ? String(window.pointsSummary?.membership?.planCode || '')
+            : '';
+        if (activePlan === planId) {
+            alert('当前套餐已生效，无需重复开通');
+            return;
+        }
         const res = await fetch('api/points/subscribe.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ planId }),
+            body: JSON.stringify({ planId, payType: 'alipay' }),
         });
-        const data = await res.json();
-        if (!data.success) {
-            alert(data.message || '开通失败');
+        const raw = await res.text();
+        let data = null;
+        try { data = JSON.parse(raw); } catch (e) { /* ignore */ }
+        if (!data) {
+            alert('服务端返回异常：' + raw.slice(0, 120));
             return;
         }
-        closeMembershipDialog();
-        await refreshPointsSummary();
-        alert('会员开通成功，每天12点赠送16积分并重置');
+        if (!data.success) {
+            alert(formatPaymentErrorHint(data.message, res.status));
+            return;
+        }
+        if (!data.data?.payInfo) {
+            alert('创建支付信息失败，请稍后重试');
+            return;
+        }
+        openInlinePayDialog({
+            title: '会员开通',
+            amount: data.data?.plan?.price,
+            outTradeNo: data.data?.outTradeNo,
+            payInfo: data.data?.payInfo,
+        });
     } catch (err) {
         alert('网络异常，开通失败');
+    } finally {
+        inlinePayActionPending = false;
     }
 }
 
@@ -333,9 +680,10 @@ function closeParamsDialog() {
 
 // ============================
 // 上传：首帧/尾帧（OSS）
+// inputOrFile: <input> 或 File 对象（支持拖拽传入）
 // ============================
-async function handleFrameUpload(input, previewId, frameType) {
-    const file = input.files[0];
+async function handleFrameUpload(inputOrFile, previewId, frameType) {
+    const file = inputOrFile instanceof File ? inputOrFile : (inputOrFile?.files?.[0]);
     if (!file || !file.type.startsWith('image/')) return;
     const preview = document.getElementById(previewId);
     if (preview) preview.innerHTML = '<span class="text-xs text-[#3B82F6]">上传中...</span>';
@@ -346,11 +694,16 @@ async function handleFrameUpload(input, previewId, frameType) {
         const res = await fetch('api/upload/image.php', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success && data.data?.url) {
+            const safeUrl = sanitizeMediaUrl(data.data.url);
+            if (!safeUrl) {
+                if (preview) preview.innerHTML = '<span class="text-xs text-red-500">返回地址无效</span>';
+                return;
+            }
             if (!window.frameUrls) window.frameUrls = {};
-            window.frameUrls[frameType] = data.data.url;
-            if (preview) preview.innerHTML = `<img src="${data.data.url}" alt="${frameType}" class="w-full h-full object-cover rounded-lg" />`;
+            window.frameUrls[frameType] = safeUrl;
+            if (preview) preview.innerHTML = `<img src="${safeUrl}" alt="${escapeHtml(frameType)}" class="w-full h-full object-cover rounded-lg" />`;
         } else {
-            if (preview) preview.innerHTML = '<span class="text-xs text-red-500">' + (data.message || '上传失败') + '</span>';
+            if (preview) preview.innerHTML = '<span class="text-xs text-red-500">' + escapeHtml(data.message || '上传失败') + '</span>';
         }
     } catch (err) {
         if (preview) preview.innerHTML = '<span class="text-xs text-red-500">上传失败</span>';
@@ -360,9 +713,10 @@ async function handleFrameUpload(input, previewId, frameType) {
 
 // ============================
 // 上传：多张参考图（OSS）
+// inputOrFiles: <input> 或 File[] 数组（支持拖拽传入）
 // ============================
-async function handleRefImagesUpload(input) {
-    const files = Array.from(input.files || []);
+async function handleRefImagesUpload(inputOrFiles) {
+    const files = Array.isArray(inputOrFiles) ? inputOrFiles : Array.from(inputOrFiles?.files || []);
     if (files.length === 0) return;
     if (!window.referenceImageUrls) window.referenceImageUrls = [];
     const preview = document.getElementById('ref-images-preview');
@@ -375,16 +729,18 @@ async function handleRefImagesUpload(input) {
             const res = await fetch('api/upload/image.php', { method: 'POST', body: formData });
             const data = await res.json();
             if (data.success && data.data?.url) {
-                window.referenceImageUrls.push(data.data.url);
+                const safeUrl = sanitizeMediaUrl(data.data.url);
+                if (!safeUrl) continue;
+                window.referenceImageUrls.push(safeUrl);
                 const div = document.createElement('div');
                 div.className = 'relative w-[60px] h-[60px] rounded-lg overflow-hidden flex-shrink-0 group';
-                div.dataset.url = data.data.url;
-                div.innerHTML = `<img src="${data.data.url}" alt="参考" class="w-full h-full object-cover" /><button type="button" onclick="removeRefImage(this)" class="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white text-xs rounded-bl flex items-center justify-center opacity-0 group-hover:opacity-100">×</button>`;
+                div.dataset.url = safeUrl;
+                div.innerHTML = `<img src="${safeUrl}" alt="参考" class="w-full h-full object-cover" /><button type="button" onclick="removeRefImage(this)" class="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white text-xs rounded-bl flex items-center justify-center opacity-0 group-hover:opacity-100">×</button>`;
                 if (preview) preview.appendChild(div);
             }
         } catch (e) { /* skip */ }
     }
-    input.value = '';
+    if (inputOrFiles && !Array.isArray(inputOrFiles) && inputOrFiles.value !== undefined) inputOrFiles.value = '';
 }
 
 function removeRefImage(btn) {
@@ -497,6 +853,230 @@ function escapeHtml(s) {
     return div.innerHTML;
 }
 
+function sanitizeMediaUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return '';
+    try {
+        const parsed = new URL(raw, window.location.origin);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+        return parsed.href;
+    } catch (e) {
+        return '';
+    }
+}
+
+const GEN_PENDING_KEY = 'gen_pending_tasks';
+const GEN_RECENT_RESULTS_KEY = 'gen_recent_results';
+
+function safeReadJSONFromStorage(key, fallback) {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return fallback;
+        const parsed = JSON.parse(raw);
+        return parsed ?? fallback;
+    } catch (e) {
+        return fallback;
+    }
+}
+
+function loadPendingTasks() {
+    const list = safeReadJSONFromStorage(GEN_PENDING_KEY, []);
+    if (!Array.isArray(list)) return [];
+    return list.filter(function (item) {
+        return item && typeof item.taskId === 'string' && item.taskId.trim() !== '';
+    });
+}
+
+function savePendingTasks(tasks) {
+    try {
+        localStorage.setItem(GEN_PENDING_KEY, JSON.stringify(Array.isArray(tasks) ? tasks : []));
+    } catch (e) {
+        // ignore
+    }
+}
+
+function loadRecentResults() {
+    const list = safeReadJSONFromStorage(GEN_RECENT_RESULTS_KEY, []);
+    return Array.isArray(list) ? list : [];
+}
+
+function saveRecentResults(results) {
+    try {
+        localStorage.setItem(GEN_RECENT_RESULTS_KEY, JSON.stringify(Array.isArray(results) ? results : []));
+    } catch (e) {
+        // ignore
+    }
+}
+
+function upsertPendingTasks(taskIds, type, prompt, meta, totalCount) {
+    const ids = Array.isArray(taskIds) ? taskIds.filter(Boolean) : [];
+    if (ids.length === 0) return;
+    const current = loadPendingTasks();
+    const indexMap = {};
+    current.forEach(function (it, idx) {
+        indexMap[it.taskId] = idx;
+    });
+    const now = Date.now();
+    ids.forEach(function (id, idx) {
+        const task = {
+            taskId: String(id),
+            type: type === 'video' ? 'video' : 'image',
+            prompt: String(prompt || ''),
+            createdAt: now,
+            meta: meta || {},
+            slotIndex: idx,
+            totalCount: Math.max(1, Number(totalCount || ids.length || 1)),
+        };
+        if (indexMap[task.taskId] !== undefined) {
+            current[indexMap[task.taskId]] = Object.assign({}, current[indexMap[task.taskId]], task);
+        } else {
+            current.push(task);
+        }
+    });
+    savePendingTasks(current);
+}
+
+function removePendingTask(taskId) {
+    const id = String(taskId || '');
+    if (!id) return false;
+    const current = loadPendingTasks();
+    const next = current.filter(function (item) { return item.taskId !== id; });
+    if (next.length === current.length) return false;
+    savePendingTasks(next);
+    return true;
+}
+
+function pushRecentResult(entry) {
+    if (!entry || !entry.taskId) return;
+    const list = loadRecentResults();
+    const filtered = list.filter(function (it) { return it.taskId !== entry.taskId; });
+    filtered.unshift(entry);
+    saveRecentResults(filtered.slice(0, 20));
+}
+
+function renderHeaderGenerationStatus() {
+    const el = document.getElementById('header-gen-status');
+    if (!el) return;
+    const pending = loadPendingTasks();
+    const done = loadRecentResults();
+    const pendingCount = pending.length;
+    const doneCount = done.length;
+    if (pendingCount <= 0) {
+        el.classList.add('hidden');
+        return;
+    }
+    const jumpType = String((pending[0] && pending[0].type) || 'image');
+    el.dataset.type = jumpType === 'video' ? 'video' : 'image';
+    el.textContent = `生成中 ${pendingCount} / 已完成 ${doneCount}`;
+    el.classList.remove('hidden');
+}
+
+function jumpToPendingGeneration() {
+    const el = document.getElementById('header-gen-status');
+    const type = String(el?.dataset?.type || 'image');
+    window.location.href = `?tab=create&type=${type === 'video' ? 'video' : 'image'}`;
+}
+
+function resolvePendingTask(task, status, payload, options) {
+    const opts = options || {};
+    if (!task || !task.taskId) return;
+    const removed = removePendingTask(task.taskId);
+    const finishedAt = Date.now();
+    pushRecentResult({
+        taskId: task.taskId,
+        type: task.type || 'image',
+        prompt: task.prompt || '',
+        status: status,
+        resultUrl: payload?.resultUrl || '',
+        errorMessage: payload?.errorMessage || '',
+        createdAt: task.createdAt || finishedAt,
+        finishedAt: finishedAt,
+    });
+    renderHeaderGenerationStatus();
+    if (!removed || opts.renderInCreatePage === false) return;
+
+    // 只在创作页尝试恢复/替换进度卡片
+    if (!document.getElementById('generation-messages')) return;
+    const slotMap = window.__pendingTaskSlotMap || {};
+    const slotIndex = Number.isInteger(slotMap[task.taskId]) ? slotMap[task.taskId] : 0;
+    if (status === 'completed') {
+        showGenerationResult(payload?.resultUrl || '', task.prompt || '', task.meta || { type: task.type }, slotIndex);
+    } else {
+        showGenerationError(payload?.errorMessage || '生成失败，请重试', task.prompt || '', task.meta || { type: task.type }, slotIndex);
+    }
+    delete slotMap[task.taskId];
+    window.__pendingTaskSlotMap = slotMap;
+}
+
+async function pollPendingTasksLightweight() {
+    if (window.__pendingPollInFlight) return;
+    const pending = loadPendingTasks();
+    renderHeaderGenerationStatus();
+    if (!pending.length) return;
+    window.__pendingPollInFlight = true;
+    try {
+        const checks = pending.slice(0, 8).map(async function (task) {
+            try {
+                const res = await fetch('api/generation/status.php?taskId=' + encodeURIComponent(task.taskId));
+                const data = await res.json();
+                if (!data.success) return;
+                const status = data.data?.status;
+                if (status === 'completed') {
+                    resolvePendingTask(task, 'completed', { resultUrl: data.data?.resultUrl || '' });
+                } else if (status === 'failed') {
+                    resolvePendingTask(task, 'failed', { errorMessage: data.data?.errorMessage || '生成失败' });
+                }
+            } catch (e) {
+                // ignore single task polling error
+            }
+        });
+        await Promise.all(checks);
+    } finally {
+        window.__pendingPollInFlight = false;
+    }
+}
+
+function restorePendingTasksOnCreatePage() {
+    const container = document.getElementById('generation-messages');
+    if (!container) return;
+    const currentType = window.currentCreationType || 'image';
+    const pending = loadPendingTasks().filter(function (item) {
+        return (item.type || 'image') === currentType;
+    });
+    if (!pending.length) return;
+
+    enterCreatingMode();
+    container.innerHTML = '';
+    container.className = pending.length === 1 ? 'space-y-6' : 'grid grid-cols-1 md:grid-cols-2 gap-4';
+    window.currentProcessingMsgIds = [];
+    window.__pendingTaskSlotMap = {};
+
+    pending.forEach(function (task, idx) {
+        const slotIndex = Number.isInteger(task.slotIndex) ? task.slotIndex : idx;
+        const totalSlots = Math.max(1, Number(task.totalCount || pending.length));
+        const meta = task.meta || { type: task.type || currentType };
+        const card = createProcessingMessage(task.prompt || '生成中...', meta, slotIndex, totalSlots);
+        card.el.dataset.msgId = card.id;
+        card.el.dataset.slotIndex = String(slotIndex);
+        container.appendChild(card.el);
+        window.currentProcessingMsgIds.push(card.id);
+        window.__pendingTaskSlotMap[task.taskId] = idx;
+    });
+
+    initGenerationBatch(pending.length);
+    setGeneratingNow(true);
+    setGenerateBtnLoading(true);
+    updateStatusBar(`生成中 ${pending.length} / 已完成 ${loadRecentResults().length}`);
+    setTimeout(scrollToLatestGeneration, 100);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function startGlobalPendingTaskPolling() {
+    if (window.__pendingPollTimer) return;
+    pollPendingTasksLightweight();
+    window.__pendingPollTimer = setInterval(pollPendingTasksLightweight, 4000);
+}
+
 // ============================
 // 布局状态切换：普通模式 ↔ 生成模式
 // ============================
@@ -536,10 +1116,19 @@ function setGenerateBtnLoading(loading) {
 }
 
 function updateGeneratePointsDisplay() {
-    if (window.currentCreationType !== 'image') return;
     const badge = document.getElementById('generate-points-badge');
     const valueEl = document.getElementById('generate-points-value');
     if (!badge || !valueEl) return;
+    const creationType = window.currentCreationType || 'image';
+    if (creationType === 'video') {
+        const pricing = window.pointsPricingVideo || {};
+        const basePer5s = Number(pricing?.doubao_video?.points_per_5s || 55);
+        const durationText = String(document.getElementById('video-duration')?.textContent || '5s');
+        const duration = Math.max(1, Math.min(30, parseInt(durationText, 10) || 5));
+        const total = Math.max(1, Math.ceil(basePer5s * (duration / 5)));
+        valueEl.textContent = total;
+        return;
+    }
     const pricing = window.pointsPricingImage || {};
     const modelId = (window.currentSettings?.selectedModel || document.getElementById('selected-model')?.textContent || 'banana').toLowerCase().replace(/\s+/g, '_');
     const modelKey = modelId === 'banana_pro' || modelId === 'banana-pro' ? 'banana_pro' : 'banana';
@@ -981,13 +1570,21 @@ async function handleGenerate() {
         }
 
         if (data.success) {
-            refreshPointsSummary();
+            if (data.data?.wallet) {
+                applyWalletSummary(data.data.wallet);
+            } else {
+                refreshPointsSummary();
+            }
             const taskId = data.data?.taskId;
             const taskIds = Array.isArray(data.data?.taskIds) && data.data.taskIds.length > 0
                 ? data.data.taskIds
                 : (taskId ? [taskId] : []);
             const status = data.data?.status;
             const submittedCount = Number(data.data?.submittedCount || taskIds.length || 1);
+            if (taskIds.length > 0 && status === 'processing') {
+                upsertPendingTasks(taskIds, type, prompt, meta, meta.count);
+                renderHeaderGenerationStatus();
+            }
             if (type === 'image' && taskIds.length > 0 && status === 'processing') {
                 const slotCount = (window.currentProcessingMsgIds || []).length || 1;
                 initGenerationBatch(slotCount);
@@ -1029,6 +1626,14 @@ async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCo
     let emptyUrlRetry = 0;
     let networkErrorStreak = 0;
     let loopCount = 0;
+    const bumpProgress = function (customLabel) {
+        loopCount += 1;
+        progress = Math.min(99, progress + (loopCount < 40 ? 2 : 1));
+        const label = customLabel || (isVideoMeta(meta)
+            ? `${Math.round(progress)}% 生成中...`
+            : `第${slotIndex + 1}张 ${Math.round(progress)}% 生成中...`);
+        updateGenerationProgress(Math.round(progress), label, slotIndex);
+    };
 
     while (true) {
         // 只允许当前批次轮询继续执行
@@ -1044,6 +1649,7 @@ async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCo
             if (!data.success) {
                 // 查询接口偶发异常时，不立即失败，继续轮询
                 console.warn('[轮询告警] status接口返回失败，继续重试:', data.message);
+                bumpProgress(isVideoMeta(meta) ? `${Math.round(progress)}% 状态同步中...` : `第${slotIndex + 1}张 ${Math.round(progress)}% 状态同步中...`);
                 updateStatusBar('状态查询重试中...');
                 await new Promise(r => setTimeout(r, 3000));
                 continue;
@@ -1063,6 +1669,14 @@ async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCo
                     }
                 }
                 updateGenerationProgress(100, `第${slotIndex + 1}张完成`, slotIndex);
+                const doneTask = {
+                    taskId: taskId,
+                    type: type || 'image',
+                    prompt: prompt || '',
+                    meta: meta || {},
+                    createdAt: Date.now(),
+                };
+                resolvePendingTask(doneTask, 'completed', { resultUrl: url }, { renderInCreatePage: false });
                 setTimeout(function () {
                     if (url) {
                         showGenerationResult(url, prompt, meta, slotIndex);
@@ -1074,17 +1688,22 @@ async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCo
             }
 
             if (status === 'failed') {
+                const failedTask = {
+                    taskId: taskId,
+                    type: type || 'image',
+                    prompt: prompt || '',
+                    meta: meta || {},
+                    createdAt: Date.now(),
+                };
+                resolvePendingTask(failedTask, 'failed', {
+                    errorMessage: data.data?.errorMessage || '生成失败，请尝试更换提示词或图片后重试',
+                }, { renderInCreatePage: false });
                 showGenerationError(data.data?.errorMessage || '生成失败，请尝试更换提示词或图片后重试', prompt, meta, slotIndex);
                 return;
             }
 
             // 0=排队中 1=生成中：持续轮询，进度卡在 99%
-            loopCount += 1;
-            progress = Math.min(99, progress + (loopCount < 40 ? 2 : 1));
-            const label = isVideoMeta(meta)
-                ? `${Math.round(progress)}% 生成中...`
-                : `第${slotIndex + 1}张 ${Math.round(progress)}% 生成中...`;
-            updateGenerationProgress(Math.round(progress), label, slotIndex);
+            bumpProgress();
             await new Promise(r => setTimeout(r, interval));
         } catch (e) {
             console.error('[轮询异常]', e);
@@ -1093,6 +1712,7 @@ async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCo
                 showGenerationError('网络异常次数过多，请检查网络后重试', prompt, meta, slotIndex);
                 return;
             }
+            bumpProgress(isVideoMeta(meta) ? `${Math.round(progress)}% 网络重试中...` : `第${slotIndex + 1}张 ${Math.round(progress)}% 网络重试中...`);
             updateStatusBar('网络抖动，自动重试中...');
             await new Promise(r => setTimeout(r, 3500));
         }
@@ -1106,7 +1726,7 @@ function openTemplateSheet() {
     const sheet = document.getElementById('template-sheet');
     if (sheet) {
         sheet.classList.remove('hidden');
-        sheet.style.display = 'flex';
+        sheet.style.display = 'block';
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 }
@@ -1152,6 +1772,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     refreshPointsSummary();
     if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
+    renderHeaderGenerationStatus();
+    restorePendingTasksOnCreatePage();
+    startGlobalPendingTaskPolling();
 
     // Ctrl+Enter / Cmd+Enter 快捷键生成
     const promptInput = document.getElementById('prompt-input');
@@ -1163,4 +1786,56 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+
+    // 参考图、首帧、尾帧 拖拽上传
+    initImageDropZones();
 });
+
+// ============================
+// 拖拽上传：参考图、首帧、尾帧
+// ============================
+function initImageDropZones() {
+    function addDropHandlers(el, onDrop) {
+        if (!el) return;
+        el.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            el.classList.add('border-[#3B82F6]', 'bg-[#F0F7FF]');
+        });
+        el.addEventListener('dragleave', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!el.contains(e.relatedTarget)) {
+                el.classList.remove('border-[#3B82F6]', 'bg-[#F0F7FF]');
+            }
+        });
+        el.addEventListener('drop', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            el.classList.remove('border-[#3B82F6]', 'bg-[#F0F7FF]');
+            const files = Array.from(e.dataTransfer?.files || []);
+            if (files.length) onDrop(files);
+        });
+    }
+
+    // 首帧
+    const firstFrameDrop = document.getElementById('first-frame-drop');
+    addDropHandlers(firstFrameDrop, function (files) {
+        const img = files.find(function (f) { return f.type.startsWith('image/'); });
+        if (img) handleFrameUpload(img, 'first-frame-preview', 'first-frame');
+    });
+
+    // 尾帧
+    const lastFrameDrop = document.getElementById('last-frame-drop');
+    addDropHandlers(lastFrameDrop, function (files) {
+        const img = files.find(function (f) { return f.type.startsWith('image/'); });
+        if (img) handleFrameUpload(img, 'last-frame-preview', 'last-frame');
+    });
+
+    // 参考图（图片生成模式）
+    const refImagesUpload = document.getElementById('ref-images-upload');
+    addDropHandlers(refImagesUpload, function (files) {
+        const images = files.filter(function (f) { return f.type.startsWith('image/'); });
+        if (images.length) handleRefImagesUpload(images);
+    });
+}

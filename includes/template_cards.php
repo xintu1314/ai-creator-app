@@ -16,12 +16,21 @@
         <?php foreach ($templates as $template): ?>
             <div class="flex-shrink-0 w-[160px] group template-card" data-template-id="<?= $template['id'] ?>">
                 <div class="relative w-full h-[200px] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-md group-hover:shadow-lg group-hover:-translate-y-1">
-                    <!-- Image -->
-                    <img
-                        src="<?= htmlspecialchars($template['image']) ?>"
-                        alt="<?= htmlspecialchars($template['title']) ?>"
-                        class="w-full h-full object-cover"
-                    />
+                    <?php if (($template['type'] ?? 'image') === 'video'): ?>
+                        <video
+                            src="<?= htmlspecialchars($template['image']) ?>"
+                            class="w-full h-full object-cover"
+                            muted
+                            playsinline
+                            preload="metadata"
+                        ></video>
+                    <?php else: ?>
+                        <img
+                            src="<?= htmlspecialchars($template['image']) ?>"
+                            alt="<?= htmlspecialchars($template['title']) ?>"
+                            class="w-full h-full object-cover"
+                        />
+                    <?php endif; ?>
                     
                     <!-- Model Tag -->
                     <div class="absolute top-2 left-2">

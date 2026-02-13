@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500" viewBox="0 0 400 500">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EEF2FF"/>
+      <stop offset="100%" stop-color="#DBEAFE"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="500" rx="20" fill="url(#g1)"/>
+  <rect x="24" y="24" width="352" height="452" rx="16" fill="url(#g2)"/>
+  <rect x="56" y="72" width="288" height="220" rx="14" fill="#BFDBFE"/>
+  <circle cx="128" cy="160" r="28" fill="#93C5FD"/>
+  <path d="M84 250 L162 182 L222 236 L262 206 L316 250 V272 H84 Z" fill="#60A5FA"/>
+  <rect x="56" y="322" width="200" height="18" rx="9" fill="#A5B4FC"/>
+  <rect x="56" y="352" width="256" height="14" rx="7" fill="#C7D2FE"/>
+  <rect x="56" y="374" width="176" height="14" rx="7" fill="#C7D2FE"/>
+  <text x="56" y="430" fill="#4F46E5" font-size="18" font-family="Arial, sans-serif">Template Preview</text>
+</svg>

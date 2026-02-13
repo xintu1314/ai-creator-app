@@ -115,6 +115,7 @@ function setVideoAspectRatio(ratio) {
         element.textContent = ratio;
     }
     updateVideoParamsDialogUI();
+    if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
 }
 
 function setVideoDuration(duration) {
@@ -127,6 +128,7 @@ function setVideoDuration(duration) {
         element.textContent = duration + 's';
     }
     updateVideoParamsDialogUI();
+    if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
 }
 
 function setVideoQuality(quality) {
@@ -135,6 +137,7 @@ function setVideoQuality(quality) {
     }
     window.currentSettings.videoQuality = quality;
     updateVideoParamsDialogUI();
+    if (typeof updateGeneratePointsDisplay === 'function') updateGeneratePointsDisplay();
 }
 
 function updateVideoParamsDialogUI() {

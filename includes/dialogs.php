@@ -290,6 +290,10 @@ window.currentSettings = {
             <p class="text-xs text-[#999] mt-1">4K 图像消耗比 2K 高 80%</p>
         </div>
         <div class="p-5 space-y-3">
+            <button type="button" onclick="rechargePoints('pkg_test_0_1')" class="w-full h-11 rounded-lg border border-[#F59E0B] bg-[#FFF7ED] hover:border-[#D97706] text-left px-4 flex items-center justify-between">
+                <span class="text-sm text-[#92400E]">0.1 元（测试）</span>
+                <span class="text-sm text-[#D97706]">3 积分</span>
+            </button>
             <button type="button" onclick="rechargePoints('pkg_9_9')" class="w-full h-11 rounded-lg border border-[#E5E5E5] hover:border-[#3B82F6] text-left px-4 flex items-center justify-between">
                 <span class="text-sm text-[#1A1A1A]">9.9 元</span>
                 <span class="text-sm text-[#3B82F6]">165 积分</span>
@@ -302,35 +306,97 @@ window.currentSettings = {
                 <span class="text-sm text-[#1A1A1A]">29.9 元</span>
                 <span class="text-sm text-[#3B82F6]">505 积分</span>
             </button>
-            <p class="text-xs text-[#999]">开发版演示：点击后直接到账，后续可接支付回调</p>
+            <p class="text-xs text-[#999]">点击套餐后将展示站内支付二维码，支付成功自动到账</p>
         </div>
     </div>
 </div>
 
 <!-- Membership Dialog -->
 <div id="membership-dialog" class="hidden fixed inset-0 z-50 dialog-overlay" onclick="closeMembershipDialog()" style="display:none;">
-    <div class="dialog-content max-w-[520px] w-[92vw] p-0" onclick="event.stopPropagation()">
+    <div class="dialog-content max-w-[980px] w-[94vw] p-0" onclick="event.stopPropagation()">
         <div class="px-5 pt-5 pb-3 border-b border-[#E5E5E5]">
             <h3 class="text-base font-medium text-[#1A1A1A]">会员方案</h3>
-            <p class="text-xs text-[#999] mt-1">每天赠送 16 积分，12:00 自动重置，不叠加</p>
+            <p class="text-xs text-[#999] mt-1">每日签到领积分（当天有效，次日12:00清零）；会员另享开通赠送积分</p>
         </div>
-        <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button type="button" onclick="subscribeMembership('member_first_month')" class="p-4 rounded-xl border border-[#E5E5E5] hover:border-[#3B82F6] text-left">
-                <div class="text-sm font-medium text-[#1A1A1A]">首月会员</div>
-                <div class="text-xs text-[#666] mt-1">29.9 元 / 30 天</div>
-            </button>
-            <button type="button" onclick="subscribeMembership('member_renew_month')" class="p-4 rounded-xl border border-[#E5E5E5] hover:border-[#3B82F6] text-left">
-                <div class="text-sm font-medium text-[#1A1A1A]">连续续费月会员</div>
-                <div class="text-xs text-[#666] mt-1">39.9 元 / 30 天</div>
-            </button>
-            <button type="button" onclick="subscribeMembership('member_single_month')" class="p-4 rounded-xl border border-[#E5E5E5] hover:border-[#3B82F6] text-left">
-                <div class="text-sm font-medium text-[#1A1A1A]">单月会员</div>
-                <div class="text-xs text-[#666] mt-1">49.9 元 / 30 天</div>
-            </button>
-            <button type="button" onclick="subscribeMembership('member_year')" class="p-4 rounded-xl border border-[#E5E5E5] hover:border-[#3B82F6] text-left">
-                <div class="text-sm font-medium text-[#1A1A1A]">年会员</div>
-                <div class="text-xs text-[#666] mt-1">299 元 / 365 天</div>
-            </button>
+        <div class="p-5">
+            <div id="membership-current-tip" class="mb-4 text-sm rounded-xl border border-[#E5E5E5] bg-[#F8FAFC] text-[#475569] px-4 py-2.5">
+                当前状态：普通用户；可通过每日签到领取积分，也可按需选择会员套餐。
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div id="membership-card-member_first_month" class="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                    <div class="text-base font-semibold text-[#1A1A1A]">首月会员</div>
+                    <div class="mt-2">
+                        <span class="text-3xl font-bold text-[#111]">¥29.9</span>
+                        <span class="text-sm text-[#666]"> / 30天</span>
+                    </div>
+                    <div class="text-xs text-[#666] mt-1">开通即送：500 积分</div>
+                    <div class="text-xs text-[#666] mt-1">每日签到：16 积分（当天有效）</div>
+                    <button id="membership-btn-member_first_month" type="button" onclick="subscribeMembership('member_first_month')" class="mt-3 h-10 w-full rounded-xl bg-[#111827] hover:bg-black text-white text-sm font-medium">立即开通</button>
+                    <ul class="mt-3 text-xs text-[#666] space-y-1">
+                        <li>• 每日签到领16积分</li>
+                        <li>• 专属会员加速通道</li>
+                    </ul>
+                </div>
+                <div id="membership-card-member_renew_month" class="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                    <div class="text-base font-semibold text-[#1A1A1A]">连续续费月会员</div>
+                    <div class="mt-2">
+                        <span class="text-3xl font-bold text-[#111]">¥39.9</span>
+                        <span class="text-sm text-[#666]"> / 30天</span>
+                    </div>
+                    <div class="text-xs text-[#666] mt-1">开通即送：670 积分</div>
+                    <div class="text-xs text-[#666] mt-1">每日签到：16 积分（当天有效）</div>
+                    <button id="membership-btn-member_renew_month" type="button" onclick="subscribeMembership('member_renew_month')" class="mt-3 h-10 w-full rounded-xl bg-[#111827] hover:bg-black text-white text-sm font-medium">立即开通</button>
+                    <ul class="mt-3 text-xs text-[#666] space-y-1">
+                        <li>• 每日签到领16积分</li>
+                        <li>• 适合连续创作用户</li>
+                    </ul>
+                </div>
+                <div id="membership-card-member_year" class="rounded-2xl border border-[#FCD34D] bg-gradient-to-b from-[#FFFBEB] to-white p-4">
+                    <div class="text-xs inline-flex px-2 py-0.5 rounded-full bg-[#FDE68A] text-[#92400E] mb-2">推荐</div>
+                    <div class="text-base font-semibold text-[#1A1A1A]">年会员</div>
+                    <div class="mt-2">
+                        <span class="text-3xl font-bold text-[#111]">¥299</span>
+                        <span class="text-sm text-[#666]"> / 365天</span>
+                    </div>
+                    <div class="text-xs text-[#666] mt-1">开通即送：5000 积分（约417分/月）</div>
+                    <div class="text-xs text-[#666] mt-1">每日签到：16 积分（当天有效）</div>
+                    <button id="membership-btn-member_year" type="button" onclick="subscribeMembership('member_year')" class="mt-3 h-10 w-full rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-white text-sm font-medium">立即开通</button>
+                    <ul class="mt-3 text-xs text-[#666] space-y-1">
+                        <li>• 长周期更省心</li>
+                        <li>• 全年持续会员权益</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                <button id="membership-btn-member_single_month" type="button" onclick="subscribeMembership('member_single_month')" class="p-3 rounded-xl border border-[#E5E5E5] hover:border-[#3B82F6] text-left">
+                    <div class="text-sm font-medium text-[#1A1A1A]">单月会员</div>
+                    <div class="text-xs text-[#666] mt-1">49.9 元 / 30 天</div>
+                    <div class="text-xs text-[#999] mt-1">开通即送：835 积分（每日签到奖励另算）</div>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Inline Payment Dialog -->
+<div id="inline-pay-dialog" class="hidden fixed inset-0 z-[60] dialog-overlay" onclick="closeInlinePayDialog()" style="display:none;">
+    <div class="dialog-content max-w-[420px] w-[92vw] p-0" onclick="event.stopPropagation()">
+        <div class="px-5 pt-5 pb-3 border-b border-[#E5E5E5] flex items-center justify-between">
+            <h3 class="text-base font-medium text-[#1A1A1A]">请完成支付</h3>
+            <button type="button" onclick="closeInlinePayDialog()" class="text-[#999] hover:text-[#333]">✕</button>
+        </div>
+        <div class="p-5">
+            <p id="inline-pay-desc" class="text-sm text-[#666] mb-3">请使用支付宝扫码支付</p>
+            <div class="w-full flex items-center justify-center mb-4">
+                <img id="inline-pay-img" src="" alt="支付二维码" class="w-52 h-52 rounded-lg border border-[#E5E5E5] object-cover hidden" />
+            </div>
+            <div class="space-y-2">
+                <a id="inline-pay-open-link" href="#" target="_blank" rel="noopener" class="w-full h-11 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm flex items-center justify-center">打开支付页面</a>
+                <button type="button" onclick="checkInlinePayStatus(true)" class="w-full h-11 rounded-lg border border-[#E5E5E5] hover:border-[#3B82F6] text-sm text-[#1A1A1A]">
+                    我已支付，刷新状态
+                </button>
+                <p id="inline-pay-status" class="text-xs text-[#999] text-center mt-2">等待支付中...</p>
+            </div>
         </div>
     </div>
 </div>

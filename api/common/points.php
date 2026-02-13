@@ -7,16 +7,22 @@ require_once __DIR__ . '/db.php';
 function points_get_pricing_config(): array {
     return [
         'packages' => [
+            ['id' => 'pkg_test_0_1', 'price' => 0.1, 'points' => 3, 'name' => '测试积分包(0.1元)'],
             ['id' => 'pkg_9_9', 'price' => 9.9, 'points' => 165, 'name' => '9.9元积分包'],
             ['id' => 'pkg_19_9', 'price' => 19.9, 'points' => 335, 'name' => '19.9元积分包'],
             ['id' => 'pkg_29_9', 'price' => 29.9, 'points' => 505, 'name' => '29.9元积分包'],
         ],
         'memberships' => [
-            ['id' => 'member_first_month', 'price' => 29.9, 'days' => 30, 'name' => '首月会员'],
-            ['id' => 'member_renew_month', 'price' => 39.9, 'days' => 30, 'name' => '连续续费月会员'],
-            ['id' => 'member_single_month', 'price' => 49.9, 'days' => 30, 'name' => '单月会员'],
-            ['id' => 'member_year', 'price' => 299.0, 'days' => 365, 'name' => '年会员'],
+            // 会员积分按 banana_pro 10分=0.3元（1分≈0.03成本）校准，目标利润率约100%
+            ['id' => 'member_first_month', 'price' => 29.9, 'days' => 30, 'name' => '首月会员', 'bonus_points' => 500],
+            ['id' => 'member_renew_month', 'price' => 39.9, 'days' => 30, 'name' => '连续续费月会员', 'bonus_points' => 670],
+            ['id' => 'member_single_month', 'price' => 49.9, 'days' => 30, 'name' => '单月会员', 'bonus_points' => 835],
+            ['id' => 'member_year', 'price' => 299.0, 'days' => 365, 'name' => '年会员', 'bonus_points' => 5000],
         ],
+        // 全站用户每日签到奖励（当天有效，次日 12:00 清零）
+        'daily_checkin_points' => 16,
+        // 兼容历史字段（后续可移除）
+        'daily_user_bonus' => 16,
         'daily_member_bonus' => 16,
         'image_cost_points' => [
             // 按目标利润率约 100% 设计，且 4K 相比 2K +80%
@@ -98,10 +104,20 @@ function points_is_membership_active(PDO $pdo, int $userId): bool {
         WHERE user_id = :user_id
           AND status = 'active'
           AND expires_at > CURRENT_TIMESTAMP
+          AND EXISTS (
+              SELECT 1
+              FROM points_ledger pl
+              WHERE pl.user_id = user_memberships.user_id
+                AND pl.source = 'membership_purchase'
+          )
         LIMIT 1
     ");
     $stmt->execute(['user_id' => $userId]);
     return (bool)$stmt->fetchColumn();
+}
+
+function points_get_daily_checkin_points(array $cfg): int {
+    return (int)($cfg['daily_checkin_points'] ?? $cfg['daily_user_bonus'] ?? $cfg['daily_member_bonus'] ?? 0);
 }
 
 function points_ensure_wallet(PDO $pdo, int $userId): array {
@@ -124,39 +140,23 @@ function points_ensure_wallet(PDO $pdo, int $userId): array {
         throw new RuntimeException('wallet not found');
     }
 
-    $isActiveMember = points_is_membership_active($pdo, $userId);
     $cfg = points_get_pricing_config();
-    $dailyBonus = (int)$cfg['daily_member_bonus'];
     $cycleKey = points_current_cycle_key();
 
-    if ($isActiveMember) {
-        if (($wallet['bonus_cycle_key'] ?? null) !== $cycleKey) {
-            $upd = $pdo->prepare("
-                UPDATE user_wallets
-                SET bonus_balance = :bonus_balance,
-                    bonus_cycle_key = :cycle_key,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = :user_id
-            ");
-            $upd->execute([
-                'bonus_balance' => $dailyBonus,
-                'cycle_key' => $cycleKey,
-                'user_id' => $userId,
-            ]);
-            $wallet['bonus_balance'] = $dailyBonus;
-            $wallet['bonus_cycle_key'] = $cycleKey;
-        }
-    } else {
-        if ((int)$wallet['bonus_balance'] !== 0 || !empty($wallet['bonus_cycle_key'])) {
-            $upd = $pdo->prepare("
-                UPDATE user_wallets
-                SET bonus_balance = 0, bonus_cycle_key = NULL, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = :user_id
-            ");
-            $upd->execute(['user_id' => $userId]);
-            $wallet['bonus_balance'] = 0;
-            $wallet['bonus_cycle_key'] = null;
-        }
+    // 仅做跨天清理：签到积分当天有效，过期后清零。
+    if (!empty($wallet['bonus_cycle_key']) && ($wallet['bonus_cycle_key'] ?? null) !== $cycleKey) {
+        $upd = $pdo->prepare("
+            UPDATE user_wallets
+            SET bonus_balance = 0,
+                bonus_cycle_key = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = :user_id
+        ");
+        $upd->execute([
+            'user_id' => $userId,
+        ]);
+        $wallet['bonus_balance'] = 0;
+        $wallet['bonus_cycle_key'] = null;
     }
 
     return [
@@ -169,6 +169,7 @@ function points_ensure_wallet(PDO $pdo, int $userId): array {
 
 function points_get_wallet_summary(int $userId): array {
     $pdo = get_db();
+    $cfg = points_get_pricing_config();
     $pdo->beginTransaction();
     try {
         $wallet = points_ensure_wallet($pdo, $userId);
@@ -176,6 +177,14 @@ function points_get_wallet_summary(int $userId): array {
             SELECT plan_code, daily_bonus_points, started_at, expires_at, status
             FROM user_memberships
             WHERE user_id = :user_id
+              AND status = 'active'
+              AND expires_at > CURRENT_TIMESTAMP
+              AND EXISTS (
+                  SELECT 1
+                  FROM points_ledger pl
+                  WHERE pl.user_id = user_memberships.user_id
+                    AND pl.source = 'membership_purchase'
+              )
             LIMIT 1
         ");
         $membershipStmt->execute(['user_id' => $userId]);
@@ -186,19 +195,77 @@ function points_get_wallet_summary(int $userId): array {
         throw $e;
     }
 
+    $cycleKey = points_current_cycle_key();
+    $checkinReward = points_get_daily_checkin_points($cfg);
+
     return [
         'paidBalance' => $wallet['paid_balance'],
         'bonusBalance' => $wallet['bonus_balance'],
         'totalBalance' => $wallet['paid_balance'] + $wallet['bonus_balance'],
         'bonusExpireAt' => points_cycle_end_time(),
+        'checkin' => [
+            'rewardPoints' => $checkinReward,
+            'checkedToday' => (($wallet['bonus_cycle_key'] ?? null) === $cycleKey),
+            'nextResetAt' => points_cycle_end_time(),
+        ],
         'membership' => $membership ? [
             'planCode' => $membership['plan_code'],
-            'dailyBonusPoints' => (int)$membership['daily_bonus_points'],
+            // 使用当前配置值，避免历史记录里旧值造成前端展示不一致
+            'dailyBonusPoints' => points_get_daily_checkin_points($cfg),
             'startedAt' => $membership['started_at'],
             'expiresAt' => $membership['expires_at'],
             'status' => $membership['status'],
         ] : null,
     ];
+}
+
+function points_daily_checkin(int $userId): array {
+    $cfg = points_get_pricing_config();
+    $reward = points_get_daily_checkin_points($cfg);
+    if ($reward <= 0) {
+        return ['success' => false, 'message' => '签到奖励未配置'];
+    }
+
+    $pdo = get_db();
+    $pdo->beginTransaction();
+    try {
+        $wallet = points_ensure_wallet($pdo, $userId);
+        $cycleKey = points_current_cycle_key();
+        if (($wallet['bonus_cycle_key'] ?? null) === $cycleKey) {
+            $pdo->rollBack();
+            return ['success' => false, 'message' => '今日已签到，请明天再来'];
+        }
+
+        $newBonus = $reward;
+        $newTotal = (int)$wallet['paid_balance'] + $newBonus;
+        $upd = $pdo->prepare("
+            UPDATE user_wallets
+            SET bonus_balance = :bonus_balance,
+                bonus_cycle_key = :cycle_key,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = :user_id
+        ");
+        $upd->execute([
+            'bonus_balance' => $newBonus,
+            'cycle_key' => $cycleKey,
+            'user_id' => $userId,
+        ]);
+
+        points_write_ledger($pdo, $userId, $reward, $newTotal, 'daily_checkin', '每日签到奖励', [
+            'cycleKey' => $cycleKey,
+            'reward' => $reward,
+        ]);
+        $pdo->commit();
+
+        return [
+            'success' => true,
+            'message' => '签到成功',
+            'wallet' => points_get_wallet_summary($userId),
+        ];
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return ['success' => false, 'message' => '签到失败：' . $e->getMessage()];
+    }
 }
 
 function points_write_ledger(PDO $pdo, int $userId, int $changeAmount, int $balanceAfter, string $source, string $description, array $meta = []): void {
@@ -419,7 +486,7 @@ function points_subscribe_membership(int $userId, string $planId): array {
             ");
             $upd->execute([
                 'plan_code' => $plan['id'],
-                'daily_bonus_points' => (int)$cfg['daily_member_bonus'],
+                'daily_bonus_points' => points_get_daily_checkin_points($cfg),
                 'started_at' => $now->format('Y-m-d H:i:s'),
                 'expires_at' => $expiresAt->format('Y-m-d H:i:s'),
                 'user_id' => $userId,
@@ -432,19 +499,36 @@ function points_subscribe_membership(int $userId, string $planId): array {
             $ins->execute([
                 'user_id' => $userId,
                 'plan_code' => $plan['id'],
-                'daily_bonus_points' => (int)$cfg['daily_member_bonus'],
+                'daily_bonus_points' => points_get_daily_checkin_points($cfg),
                 'started_at' => $now->format('Y-m-d H:i:s'),
                 'expires_at' => $expiresAt->format('Y-m-d H:i:s'),
             ]);
         }
 
         $wallet = points_ensure_wallet($pdo, $userId);
+        $grantPoints = (int)($plan['bonus_points'] ?? 0);
+        $newPaid = (int)$wallet['paid_balance'];
+        if ($grantPoints > 0) {
+            $newPaid += $grantPoints;
+            $updWallet = $pdo->prepare("
+                UPDATE user_wallets
+                SET paid_balance = :paid_balance,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = :user_id
+            ");
+            $updWallet->execute([
+                'paid_balance' => $newPaid,
+                'user_id' => $userId,
+            ]);
+        }
+        $wallet['paid_balance'] = $newPaid;
         $totalBalance = (int)$wallet['paid_balance'] + (int)$wallet['bonus_balance'];
 
-        points_write_ledger($pdo, $userId, 0, $totalBalance, 'membership_purchase', '购买会员：' . $plan['name'], [
+        points_write_ledger($pdo, $userId, $grantPoints, $totalBalance, 'membership_purchase', '购买会员：' . $plan['name'], [
             'planId' => $plan['id'],
             'price' => $plan['price'],
             'days' => $plan['days'],
+            'bonusPoints' => $grantPoints,
         ]);
         $pdo->commit();
 

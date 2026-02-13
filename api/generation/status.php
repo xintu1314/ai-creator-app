@@ -9,6 +9,7 @@ require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../data/assets.php';
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/points.php';
+require_once __DIR__ . '/../common/oss.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_error('Method not allowed', 405);
@@ -121,6 +122,10 @@ $ensureAssetExists = function (array $taskRow, array $taskParams): void {
         if ($status === 2) {
             // 成功
             $imageUrl = $result['image_url'] ?? '';
+            $stableUrl = $imageUrl ? oss_mirror_remote_media($imageUrl, 'image') : null;
+            if (!empty($stableUrl)) {
+                $imageUrl = $stableUrl;
+            }
             $stmt = $pdo->prepare("
                 UPDATE tasks
                 SET status = 'completed', result_url = ?, updated_at = CURRENT_TIMESTAMP
@@ -200,6 +205,10 @@ $ensureAssetExists = function (array $taskRow, array $taskParams): void {
 
         if ($result['status'] === 'completed') {
             $videoUrl = (string)($result['result_url'] ?? '');
+            $stableUrl = $videoUrl ? oss_mirror_remote_media($videoUrl, 'video') : null;
+            if (!empty($stableUrl)) {
+                $videoUrl = $stableUrl;
+            }
             $stmt = $pdo->prepare("
                 UPDATE tasks
                 SET status = 'completed', result_url = ?, updated_at = CURRENT_TIMESTAMP
@@ -260,5 +269,5 @@ $ensureAssetExists = function (array $taskRow, array $taskParams): void {
         ]);
     }
 } catch (Throwable $e) {
-    json_error('查询失败：' . $e->getMessage(), 500);
+    json_exception('查询失败，请稍后重试', $e, 500);
 }

@@ -8,4 +8,5 @@ require_once __DIR__ . '/../common/response.php';
 require_once __DIR__ . '/../data/categories.php';
 
 $data = get_categories();
+set_public_cache_headers(300, 60);
 json_success($data);

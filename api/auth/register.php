@@ -81,6 +81,6 @@ try {
         json_error('手机号已注册，请直接登录');
         exit;
     }
-    json_error('注册失败：' . $e->getMessage(), 500);
+    json_exception('注册失败，请稍后重试', $e, 500);
 }
 

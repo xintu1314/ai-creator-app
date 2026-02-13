@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:tailwind:php": "tailwindcss -c tailwind.config.js -i ./assets/css/tailwind.input.css -o ./assets/css/tailwind.css --minify",
     "lint": "eslint .",
     "preview": "vite preview"
   },

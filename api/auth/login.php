@@ -146,6 +146,6 @@ try {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    json_error('登录失败：' . $e->getMessage(), 500);
+    json_exception('登录失败，请稍后重试', $e, 500);
 }
 

@@ -58,7 +58,7 @@ try {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO publish_templates (user_id, content_type, model_id, model_name, category, title, content, image, review_status, is_online)
-            VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image, 'pending', true)
+            VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image, 'approved', true)
             RETURNING id
         ");
         $stmt->execute([
@@ -95,5 +95,5 @@ try {
         'message' => '发布成功',
     ]);
 } catch (Throwable $e) {
-    json_error('数据库写入失败：' . $e->getMessage(), 500);
+    json_exception('发布失败，请稍后重试', $e, 500);
 }

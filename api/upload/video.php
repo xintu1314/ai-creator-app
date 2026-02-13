@@ -1,6 +1,6 @@
 <?php
 /**
- * 视频上传接口 - 上传到阿里云 OSS（管理员）
+ * 视频上传接口 - 上传到阿里云 OSS
  * POST /api/upload/video.php
  * Content-Type: multipart/form-data
  * 字段: file (必填)
@@ -8,7 +8,7 @@
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
-require_once __DIR__ . '/../common/admin.php';
+require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/oss.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -16,8 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// 仅管理员可调用
-admin_require();
+if (auth_get_current_user_id() <= 0) {
+    json_error('请先登录', 401);
+    exit;
+}
 
 $allowedTypes = [
     'video/mp4' => 'mp4',
@@ -73,7 +75,7 @@ if ($ext === '') {
 }
 
 $prefix = trim((string)($_POST['prefix'] ?? 'assets/videos/tutorials'));
-$allowedPrefixes = ['assets/videos/tutorials'];
+$allowedPrefixes = ['assets/videos/tutorials', 'assets/videos/templates'];
 if (!in_array($prefix, $allowedPrefixes, true)) {
     $prefix = 'assets/videos/tutorials';
 }
