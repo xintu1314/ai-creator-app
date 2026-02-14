@@ -1,7 +1,7 @@
 <?php
 /**
  * POST /api/auth/login.php
- * 手机号登录（支持：验证码 / 密码）
+ * 手机号验证码登录（登录注册一体）
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
@@ -20,18 +20,20 @@ $input = json_decode($raw, true) ?? [];
 
 $phone = sms_normalize_phone((string)($input['phone'] ?? ''));
 $code = trim((string)($input['code'] ?? ''));
-$password = (string)($input['password'] ?? '');
 
 if (!sms_is_valid_phone($phone)) {
     json_error('请输入正确的11位手机号');
     exit;
 }
-if (!preg_match('/^\d{6}$/', $code) && (strlen($password) < 6 || strlen($password) > 64)) {
-    json_error('请输入6位验证码或6-64位密码');
+if (!preg_match('/^\d{6}$/', $code)) {
+    json_error('请输入6位验证码');
     exit;
 }
 
 try {
+    $cfg = sms_config();
+    $maxVerifyAttempts = max(1, (int)($cfg['max_verify_attempts'] ?? 5));
+
     $pdo = get_db();
     $pdo->beginTransaction();
 
@@ -50,84 +52,92 @@ try {
         exit;
     }
 
-    $usingCode = preg_match('/^\d{6}$/', $code) === 1;
-    if ($usingCode) {
-        $codeStmt = $pdo->prepare("
-            SELECT id, code, expires_at
-            FROM sms_verification_codes
-            WHERE phone = :phone
-              AND purpose = 'login'
-              AND status = 'pending'
-            ORDER BY created_at DESC
-            LIMIT 1
-            FOR UPDATE
-        ");
-        $codeStmt->execute(['phone' => $phone]);
-        $codeRow = $codeStmt->fetch(PDO::FETCH_ASSOC);
+    $codeStmt = $pdo->prepare("
+        SELECT id, code, expires_at, fail_count
+        FROM sms_verification_codes
+        WHERE phone = :phone
+          AND purpose = 'login'
+          AND status = 'pending'
+        ORDER BY created_at DESC
+        LIMIT 1
+        FOR UPDATE
+    ");
+    $codeStmt->execute(['phone' => $phone]);
+    $codeRow = $codeStmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$codeRow) {
-            $pdo->rollBack();
-            json_error('验证码不存在或已失效', 401);
-            exit;
-        }
-        if (strtotime((string)$codeRow['expires_at']) < time()) {
-            $expireStmt = $pdo->prepare("UPDATE sms_verification_codes SET status = 'expired' WHERE id = :id");
-            $expireStmt->execute(['id' => (int)$codeRow['id']]);
-            $pdo->commit();
-            json_error('验证码已过期，请重新获取', 401);
-            exit;
-        }
-        if ((string)$codeRow['code'] !== $code) {
-            $pdo->rollBack();
-            json_error('验证码错误', 401);
-            exit;
-        }
+    if (!$codeRow) {
+        $pdo->rollBack();
+        json_error('验证码不存在或已失效', 401);
+        exit;
+    }
+    if (strtotime((string)$codeRow['expires_at']) < time()) {
+        $expireStmt = $pdo->prepare("UPDATE sms_verification_codes SET status = 'expired' WHERE id = :id");
+        $expireStmt->execute(['id' => (int)$codeRow['id']]);
+        $pdo->commit();
+        json_error('验证码已过期，请重新获取', 401);
+        exit;
+    }
 
-        $useStmt = $pdo->prepare("
+    if ((string)$codeRow['code'] !== $code) {
+        $nextFailCount = (int)$codeRow['fail_count'] + 1;
+        $newStatus = $nextFailCount >= $maxVerifyAttempts ? 'expired' : 'pending';
+        $failStmt = $pdo->prepare("
             UPDATE sms_verification_codes
-            SET status = 'used', used_at = CURRENT_TIMESTAMP
+            SET fail_count = :fail_count, status = :status
             WHERE id = :id
         ");
-        $useStmt->execute(['id' => (int)$codeRow['id']]);
-
-        if (!$user) {
-            $masked = substr($phone, 0, 3) . '****' . substr($phone, -4);
-            $account = 'u' . $phone;
-            $dummyPwd = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
-            try {
-                $createStmt = $pdo->prepare("
-                    INSERT INTO users (account, phone, password_hash, nickname)
-                    VALUES (:account, :phone, :password_hash, :nickname)
-                    RETURNING id, account, phone, nickname, password_hash, role, status
-                ");
-                $createStmt->execute([
-                    'account' => $account,
-                    'phone' => $phone,
-                    'password_hash' => $dummyPwd,
-                    'nickname' => '用户' . $masked,
-                ]);
-                $user = $createStmt->fetch(PDO::FETCH_ASSOC);
-            } catch (Throwable $e) {
-                // 并发下可能已被其他请求创建，回查并继续登录
-                $refetch = $pdo->prepare("
-                    SELECT id, account, phone, nickname, password_hash, role, status
-                    FROM users
-                    WHERE phone = :phone
-                    LIMIT 1
-                    FOR UPDATE
-                ");
-                $refetch->execute(['phone' => $phone]);
-                $user = $refetch->fetch(PDO::FETCH_ASSOC);
-                if (!$user) {
-                    throw $e;
-                }
-            }
-        }
-    } else {
-        if (!$user || !password_verify($password, (string)$user['password_hash'])) {
-            $pdo->rollBack();
-            json_error('手机号或密码错误', 401);
+        $failStmt->execute([
+            'fail_count' => $nextFailCount,
+            'status' => $newStatus,
+            'id' => (int)$codeRow['id'],
+        ]);
+        $pdo->commit();
+        if ($newStatus === 'expired') {
+            json_error('验证码错误次数过多，请重新获取', 401);
             exit;
+        }
+        json_error('验证码错误', 401);
+        exit;
+    }
+
+    $useStmt = $pdo->prepare("
+        UPDATE sms_verification_codes
+        SET status = 'used', used_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ");
+    $useStmt->execute(['id' => (int)$codeRow['id']]);
+
+    if (!$user) {
+        $masked = substr($phone, 0, 3) . '****' . substr($phone, -4);
+        $account = 'u' . $phone;
+        $dummyPwd = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+        try {
+            $createStmt = $pdo->prepare("
+                INSERT INTO users (account, phone, password_hash, nickname)
+                VALUES (:account, :phone, :password_hash, :nickname)
+                RETURNING id, account, phone, nickname, password_hash, role, status
+            ");
+            $createStmt->execute([
+                'account' => $account,
+                'phone' => $phone,
+                'password_hash' => $dummyPwd,
+                'nickname' => '用户' . $masked,
+            ]);
+            $user = $createStmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            // 并发下可能已被其他请求创建，回查并继续登录
+            $refetch = $pdo->prepare("
+                SELECT id, account, phone, nickname, password_hash, role, status
+                FROM users
+                WHERE phone = :phone
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $refetch->execute(['phone' => $phone]);
+            $user = $refetch->fetch(PDO::FETCH_ASSOC);
+            if (!$user) {
+                throw $e;
+            }
         }
     }
 

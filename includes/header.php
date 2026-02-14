@@ -46,7 +46,7 @@
             class="hidden h-9 px-3 text-sm rounded-lg transition-colors text-[#4F46E5] bg-[#EEF2FF] hover:bg-[#E0E7FF] border border-[#C7D2FE]"
             title="查看进行中的生成任务"
         >
-            生成中 0 / 已完成 0
+            生成中 0
         </button>
         <?php endif; ?>
 
@@ -87,12 +87,6 @@
                 <?= $headerMembershipActive ? '会员中' : '普通用户' ?>
             </span>
 
-            <!-- 通知 -->
-            <button class="relative h-9 w-9 flex items-center justify-center text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5] rounded-lg transition-colors">
-                <i data-lucide="bell" class="w-5 h-5"></i>
-                <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-
             <!-- 用户信息 -->
             <div class="h-9 px-3 rounded-lg bg-[#F5F5F5] flex items-center gap-2">
                 <a
@@ -118,16 +112,9 @@
             <button
                 type="button"
                 onclick="openAuthDialog('login')"
-                class="h-9 px-4 text-sm text-[#3B82F6] hover:bg-[#F0F7FF] rounded-lg transition-colors"
-            >
-                登录
-            </button>
-            <button
-                type="button"
-                onclick="openAuthDialog('register')"
                 class="h-9 px-4 text-sm font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors"
             >
-                注册
+                登录
             </button>
         <?php endif; ?>
     </div>

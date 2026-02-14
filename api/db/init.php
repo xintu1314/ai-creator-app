@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS sms_verification_codes (
     phone VARCHAR(20) NOT NULL,
     purpose VARCHAR(32) NOT NULL DEFAULT 'login',
     code VARCHAR(6) NOT NULL,
+    fail_count INTEGER NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'used', 'expired')),
     ip VARCHAR(64) DEFAULT '',
     expires_at TIMESTAMP NOT NULL,
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS sms_verification_codes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ");
+$pdo->exec("ALTER TABLE sms_verification_codes ADD COLUMN IF NOT EXISTS fail_count INTEGER NOT NULL DEFAULT 0");
 $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sms_phone_created ON sms_verification_codes(phone, created_at DESC)");
 $pdo->exec("CREATE INDEX IF NOT EXISTS idx_sms_phone_purpose_status ON sms_verification_codes(phone, purpose, status)");
 

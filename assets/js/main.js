@@ -31,12 +31,11 @@ function closeAuthDialog() {
 }
 
 function switchAuthTab(mode) {
-    const normalized = mode === 'register' ? 'register' : 'login';
+    const normalized = 'login';
     const modeInput = document.getElementById('auth-mode');
     const loginTab = document.getElementById('auth-tab-login');
     const registerTab = document.getElementById('auth-tab-register');
     const subtitle = document.getElementById('auth-subtitle');
-    const nicknameWrap = document.getElementById('auth-register-nickname-wrap');
     const submitBtn = document.getElementById('auth-submit-btn');
     if (modeInput) modeInput.value = normalized;
 
@@ -46,12 +45,11 @@ function switchAuthTab(mode) {
         loginTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'login' ? selectedClass : normalClass);
     }
     if (registerTab) {
-        registerTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'register' ? selectedClass : normalClass);
+        registerTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + normalClass;
     }
 
-    if (subtitle) subtitle.textContent = normalized === 'login' ? '手机号 + 密码登录，未注册请先注册' : '手机号 + 密码注册，已注册请直接登录';
-    if (submitBtn) submitBtn.textContent = normalized === 'login' ? '登录' : '注册';
-    if (nicknameWrap) nicknameWrap.classList.toggle('hidden', normalized !== 'register');
+    if (subtitle) subtitle.textContent = '请输入手机号与短信验证码，未注册手机号将自动创建账号';
+    if (submitBtn) submitBtn.textContent = '登录 / 注册';
     setAuthError('');
 }
 
@@ -75,18 +73,16 @@ function normalizePhone(phone) {
 
 async function submitAuthForm(event) {
     event.preventDefault();
-    const mode = document.getElementById('auth-mode')?.value === 'register' ? 'register' : 'login';
     const phone = normalizePhone((document.getElementById('auth-phone')?.value || '').trim());
-    const password = document.getElementById('auth-password')?.value || '';
-    const nickname = (document.getElementById('auth-nickname')?.value || '').trim();
+    const code = (document.getElementById('auth-code')?.value || '').trim();
     const submitBtn = document.getElementById('auth-submit-btn');
 
     if (!/^1\d{10}$/.test(phone)) {
         setAuthError('请输入正确的11位手机号');
         return;
     }
-    if (password.length < 6 || password.length > 64) {
-        setAuthError('密码长度为6-64位');
+    if (!/^\d{6}$/.test(code)) {
+        setAuthError('请输入6位短信验证码');
         return;
     }
 
@@ -94,18 +90,14 @@ async function submitAuthForm(event) {
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
-        submitBtn.textContent = mode === 'register' ? '注册中...' : '登录中...';
+        submitBtn.textContent = '登录中...';
     }
 
     try {
-        const endpoint = mode === 'register' ? 'api/auth/register.php' : 'api/auth/login.php';
-        const payload = { phone, password };
-        if (mode === 'register' && nickname) payload.nickname = nickname;
-
-        const res = await fetch(endpoint, {
+        const res = await fetch('api/auth/login.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ phone, code }),
         });
         const data = await res.json();
         if (!data.success) {
@@ -119,7 +111,7 @@ async function submitAuthForm(event) {
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-            submitBtn.textContent = mode === 'register' ? '注册' : '登录';
+            submitBtn.textContent = '登录 / 注册';
         }
     }
 }
@@ -170,7 +162,7 @@ async function sendLoginCode() {
         if (data.data?.debugCode) {
             setAuthError(`调试验证码：${data.data.debugCode}`);
         }
-        startSendCodeCountdown(data.data?.expiresIn || 60);
+        startSendCodeCountdown(data.data?.resendIn || 60);
     } catch (err) {
         setAuthError('网络异常，验证码发送失败');
         setSendCodeBtnText('获取验证码', false);
@@ -958,16 +950,14 @@ function renderHeaderGenerationStatus() {
     const el = document.getElementById('header-gen-status');
     if (!el) return;
     const pending = loadPendingTasks();
-    const done = loadRecentResults();
     const pendingCount = pending.length;
-    const doneCount = done.length;
     if (pendingCount <= 0) {
         el.classList.add('hidden');
         return;
     }
     const jumpType = String((pending[0] && pending[0].type) || 'image');
     el.dataset.type = jumpType === 'video' ? 'video' : 'image';
-    el.textContent = `生成中 ${pendingCount} / 已完成 ${doneCount}`;
+    el.textContent = `生成中 ${pendingCount}`;
     el.classList.remove('hidden');
 }
 
@@ -1066,9 +1056,17 @@ function restorePendingTasksOnCreatePage() {
     initGenerationBatch(pending.length);
     setGeneratingNow(true);
     setGenerateBtnLoading(true);
-    updateStatusBar(`生成中 ${pending.length} / 已完成 ${loadRecentResults().length}`);
+    updateStatusBar(`生成中 ${pending.length}`);
     setTimeout(scrollToLatestGeneration, 100);
     if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // 重新启动详细轮询，否则进度会一直卡在 0%（从其他页面返回时 pollTaskStatus 已停止）
+    pending.forEach(function (task, idx) {
+        const slotIndex = Number.isInteger(task.slotIndex) ? task.slotIndex : idx;
+        const totalSlots = Math.max(1, Number(task.totalCount || pending.length));
+        const meta = task.meta || { type: task.type || currentType };
+        pollTaskStatus(task.taskId, task.type || 'image', task.prompt || '', meta, slotIndex, totalSlots);
+    });
 }
 
 function startGlobalPendingTaskPolling() {

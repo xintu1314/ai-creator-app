@@ -81,7 +81,6 @@ function sms_send_aliyun(string $phone, string $templateCode, array $templatePar
     ]);
     $resp = curl_exec($ch);
     $err = curl_error($ch);
-    curl_close($ch);
 
     if ($resp === false) {
         return ['success' => false, 'message' => '短信请求失败：' . $err];

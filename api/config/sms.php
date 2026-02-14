@@ -16,6 +16,10 @@ $default = [
         'code_ttl_seconds' => (int)(getenv('ALIYUN_SMS_CODE_TTL_SECONDS') ?: 300),
         'send_cooldown_seconds' => (int)(getenv('ALIYUN_SMS_SEND_COOLDOWN_SECONDS') ?: 60),
         'daily_limit_per_phone' => (int)(getenv('ALIYUN_SMS_DAILY_LIMIT_PER_PHONE') ?: 20),
+        'ip_limit_per_minute' => (int)(getenv('ALIYUN_SMS_IP_LIMIT_PER_MINUTE') ?: 5),
+        'ip_limit_per_hour' => (int)(getenv('ALIYUN_SMS_IP_LIMIT_PER_HOUR') ?: 30),
+        'ip_limit_per_day' => (int)(getenv('ALIYUN_SMS_IP_LIMIT_PER_DAY') ?: 200),
+        'max_verify_attempts' => (int)(getenv('ALIYUN_SMS_MAX_VERIFY_ATTEMPTS') ?: 5),
     ],
 ];
 

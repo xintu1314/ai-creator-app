@@ -27,7 +27,11 @@ $cfg = sms_config();
 $ttl = max(60, (int)($cfg['code_ttl_seconds'] ?? 300));
 $cooldown = max(30, (int)($cfg['send_cooldown_seconds'] ?? 60));
 $dailyLimit = max(1, (int)($cfg['daily_limit_per_phone'] ?? 20));
+$ipLimitPerMinute = max(1, (int)($cfg['ip_limit_per_minute'] ?? 5));
+$ipLimitPerHour = max(1, (int)($cfg['ip_limit_per_hour'] ?? 30));
+$ipLimitPerDay = max(1, (int)($cfg['ip_limit_per_day'] ?? 200));
 $debugReturnCode = !app_is_production() && !empty($cfg['debug_return_code']);
+$ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 64);
 
 try {
     $pdo = get_db();
@@ -35,7 +39,7 @@ try {
 
     // 发送冷却检查
     $latestStmt = $pdo->prepare("
-        SELECT created_at
+        SELECT GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at))))::INT AS passed_seconds
         FROM sms_verification_codes
         WHERE phone = :phone
           AND purpose = :purpose
@@ -48,7 +52,7 @@ try {
     ]);
     $latest = $latestStmt->fetch(PDO::FETCH_ASSOC);
     if ($latest) {
-        $sec = time() - strtotime((string)$latest['created_at']);
+        $sec = (int)($latest['passed_seconds'] ?? 0);
         if ($sec < $cooldown) {
             $pdo->rollBack();
             json_error('发送过于频繁，请' . ($cooldown - $sec) . '秒后重试');
@@ -56,7 +60,7 @@ try {
         }
     }
 
-    // 每日限制
+    // 每日限制（手机号）
     $todayStart = (new DateTimeImmutable('today', new DateTimeZone('Asia/Shanghai')))->format('Y-m-d H:i:s');
     $cntStmt = $pdo->prepare("
         SELECT COUNT(*) AS c
@@ -77,9 +81,66 @@ try {
         exit;
     }
 
+    // 频控（IP）
+    if ($ip !== '') {
+        $ipMinuteStmt = $pdo->prepare("
+            SELECT COUNT(*) AS c
+            FROM sms_verification_codes
+            WHERE ip = :ip
+              AND created_at >= (CURRENT_TIMESTAMP - INTERVAL '1 minute')
+        ");
+        $ipMinuteStmt->execute(['ip' => $ip]);
+        if ((int)$ipMinuteStmt->fetchColumn() >= $ipLimitPerMinute) {
+            $pdo->rollBack();
+            json_error('请求过于频繁，请稍后重试');
+            exit;
+        }
+
+        $ipHourStmt = $pdo->prepare("
+            SELECT COUNT(*) AS c
+            FROM sms_verification_codes
+            WHERE ip = :ip
+              AND created_at >= (CURRENT_TIMESTAMP - INTERVAL '1 hour')
+        ");
+        $ipHourStmt->execute(['ip' => $ip]);
+        if ((int)$ipHourStmt->fetchColumn() >= $ipLimitPerHour) {
+            $pdo->rollBack();
+            json_error('当前网络发送次数过多，请1小时后重试');
+            exit;
+        }
+
+        $ipDayStmt = $pdo->prepare("
+            SELECT COUNT(*) AS c
+            FROM sms_verification_codes
+            WHERE ip = :ip
+              AND created_at >= :today_start
+        ");
+        $ipDayStmt->execute([
+            'ip' => $ip,
+            'today_start' => $todayStart,
+        ]);
+        if ((int)$ipDayStmt->fetchColumn() >= $ipLimitPerDay) {
+            $pdo->rollBack();
+            json_error('当前网络今日发送次数已达上限');
+            exit;
+        }
+    }
+
+    // 将该手机号历史待使用验证码置为过期，仅保留最新一条有效
+    $expirePendingStmt = $pdo->prepare("
+        UPDATE sms_verification_codes
+        SET status = 'expired'
+        WHERE phone = :phone
+          AND purpose = :purpose
+          AND status = 'pending'
+    ");
+    $expirePendingStmt->execute([
+        'phone' => $phone,
+        'purpose' => $purpose,
+    ]);
+
     $code = sms_generate_code();
     $expiresAt = date('Y-m-d H:i:s', time() + $ttl);
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
 
     $insStmt = $pdo->prepare("
         INSERT INTO sms_verification_codes (phone, purpose, code, status, ip, expires_at)
@@ -118,6 +179,7 @@ try {
     json_success([
         'phone' => $phone,
         'expiresIn' => $ttl,
+        'resendIn' => $cooldown,
     ], '验证码已发送');
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
