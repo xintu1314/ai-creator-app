@@ -7,7 +7,6 @@ require_once __DIR__ . '/db.php';
 function points_get_pricing_config(): array {
     return [
         'packages' => [
-            ['id' => 'pkg_test_0_1', 'price' => 0.1, 'points' => 3, 'name' => '测试积分包(0.1元)'],
             ['id' => 'pkg_9_9', 'price' => 9.9, 'points' => 165, 'name' => '9.9元积分包'],
             ['id' => 'pkg_19_9', 'price' => 19.9, 'points' => 335, 'name' => '19.9元积分包'],
             ['id' => 'pkg_29_9', 'price' => 29.9, 'points' => 505, 'name' => '29.9元积分包'],

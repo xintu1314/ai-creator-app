@@ -290,10 +290,6 @@ window.currentSettings = {
             <p class="text-xs text-[#999] mt-1">4K 图像消耗比 2K 高 80%</p>
         </div>
         <div class="p-5 space-y-3">
-            <button type="button" onclick="rechargePoints('pkg_test_0_1')" class="w-full h-11 rounded-lg border border-[#F59E0B] bg-[#FFF7ED] hover:border-[#D97706] text-left px-4 flex items-center justify-between">
-                <span class="text-sm text-[#92400E]">0.1 元（测试）</span>
-                <span class="text-sm text-[#D97706]">3 积分</span>
-            </button>
             <button type="button" onclick="rechargePoints('pkg_9_9')" class="w-full h-11 rounded-lg border border-[#E5E5E5] hover:border-[#3B82F6] text-left px-4 flex items-center justify-between">
                 <span class="text-sm text-[#1A1A1A]">9.9 元</span>
                 <span class="text-sm text-[#3B82F6]">165 积分</span>
