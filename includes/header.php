@@ -84,7 +84,7 @@
                 id="header-membership-status"
                 class="h-7 px-2.5 rounded-full text-xs flex items-center border <?= $headerMembershipActive ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-[#F5F5F5] text-[#666] border-[#E5E5E5]' ?>"
             >
-                <?= $headerMembershipActive ? '会员中' : '普通用户' ?>
+                <?= $headerMembershipActive ? '会员中' : '非会员' ?>
             </span>
 
             <!-- 用户信息 -->

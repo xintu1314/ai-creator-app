@@ -320,7 +320,7 @@ window.currentSettings = {
         </div>
         <div class="p-5">
             <div id="membership-current-tip" class="mb-4 text-sm rounded-xl border border-[#E5E5E5] bg-[#F8FAFC] text-[#475569] px-4 py-2.5">
-                当前状态：普通用户；可通过每日签到领取积分，也可按需选择会员套餐。
+                当前状态：非会员；可通过每日签到领取积分，也可按需选择会员套餐。
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div id="membership-card-member_first_month" class="rounded-2xl border border-[#E5E7EB] bg-white p-4">

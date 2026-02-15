@@ -372,7 +372,7 @@ function syncMembershipDialogState(wallet) {
             tipEl.textContent = `当前会员：${planLabel}，到期时间：${membership.expiresAt || '-'}；每日签到可领 ${membership.dailyBonusPoints || 16} 积分`;
         } else {
             tipEl.className = 'mb-4 text-sm rounded-xl border border-[#E5E5E5] bg-[#F8FAFC] text-[#475569] px-4 py-2.5';
-            tipEl.textContent = '当前状态：普通用户；可通过每日签到领取积分，也可按需选择会员套餐。';
+            tipEl.textContent = '当前状态：非会员；可通过每日签到领取积分，也可按需选择会员套餐。';
         }
     }
 
@@ -530,7 +530,7 @@ function applyWalletSummary(wallet) {
     const memberStatusEl = document.getElementById('header-membership-status');
     if (memberStatusEl) {
         const isActiveMember = !!(wallet.membership && wallet.membership.status === 'active');
-        memberStatusEl.textContent = isActiveMember ? '会员中' : '普通用户';
+        memberStatusEl.textContent = isActiveMember ? '会员中' : '非会员';
         memberStatusEl.className = isActiveMember
             ? 'h-7 px-2.5 rounded-full text-xs flex items-center border bg-amber-50 text-amber-700 border-amber-200'
             : 'h-7 px-2.5 rounded-full text-xs flex items-center border bg-[#F5F5F5] text-[#666] border-[#E5E5E5]';
