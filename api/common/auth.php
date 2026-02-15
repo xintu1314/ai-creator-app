@@ -30,6 +30,23 @@ function auth_ensure_user_admin_columns(): void {
 
 function auth_boot_session(): void {
     if (session_status() === PHP_SESSION_NONE) {
+        // Use a dedicated session cookie name. Cookies are shared across ports,
+        // so using the default PHPSESSID can be overwritten by other apps on the same host.
+        $sessName = trim((string)getenv('SESSION_NAME'));
+        if ($sessName === '') $sessName = 'ai_creator_sess';
+        @session_name($sessName);
+
+        // Ensure stable cookie attributes (avoid cross-site issues; keep defaults otherwise).
+        if (PHP_VERSION_ID >= 70300) {
+            @session_set_cookie_params([
+                'lifetime' => 0,
+                'path' => '/',
+                'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        }
+
         // Some production environments have an unwritable session.save_path.
         // Fix it proactively to avoid "login works but API still 401" (session not persisted).
         $handler = strtolower((string)ini_get('session.save_handler'));
