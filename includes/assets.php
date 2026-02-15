@@ -58,7 +58,7 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
                 $downloadName = ($item['type'] ?? 'file') . '-' . ($item['id'] ?? '') . '.' . $ext;
             ?>
                 <div class="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
-                    <div class="relative aspect-[3/4] bg-[#F7F7F7] asset-media-wrap cursor-pointer" data-asset-url="<?= $mediaUrl ?>" onclick="var u=this.getAttribute('data-asset-url');if(u)window.open(u,'_blank','noopener')">
+                    <div class="relative aspect-[3/4] bg-[#F7F7F7] asset-media-wrap cursor-pointer" data-asset-url="<?= $mediaUrl ?>" data-asset-video="<?= $isVideo ? '1' : '0' ?>" onclick="var u=this.getAttribute('data-asset-url');var v=this.getAttribute('data-asset-video')==='1';if(u)openAssetPreview(u,v)">
                         <?php if ($isVideo): ?>
                             <video
                                 src="<?= $mediaUrl ?>"
@@ -83,9 +83,9 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
                             </span>
                         </div>
                         <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                            <a href="<?= $mediaUrl ?>" target="_blank" rel="noopener" class="h-9 px-3 rounded-lg bg-white/90 hover:bg-white text-sm font-medium text-[#1A1A1A] flex items-center gap-1.5" onclick="event.stopPropagation()">
-                                <i data-lucide="external-link" class="w-4 h-4"></i>查看
-                            </a>
+                            <button type="button" data-asset-url="<?= $mediaUrl ?>" data-asset-video="<?= $isVideo ? '1' : '0' ?>" class="h-9 px-3 rounded-lg bg-white/90 hover:bg-white text-sm font-medium text-[#1A1A1A] flex items-center gap-1.5" onclick="event.stopPropagation();openAssetPreview(this.getAttribute('data-asset-url'),this.getAttribute('data-asset-video')==='1')">
+                                <i data-lucide="eye" class="w-4 h-4"></i>查看
+                            </button>
                             <a href="<?= $mediaUrl ?>" download="<?= htmlspecialchars($downloadName) ?>" class="h-9 px-3 rounded-lg bg-white/90 hover:bg-white text-sm font-medium text-[#1A1A1A] flex items-center gap-1.5" onclick="event.stopPropagation()">
                                 <i data-lucide="download" class="w-4 h-4"></i>下载
                             </a>
@@ -111,3 +111,44 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
         </div>
     <?php endif; ?>
 </div>
+
+<!-- 资产预览弹窗 -->
+<div id="asset-preview-dialog" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onclick="closeAssetPreview()">
+    <div class="relative max-w-[90vw] max-h-[90vh] bg-black rounded-lg overflow-hidden" onclick="event.stopPropagation()">
+        <button type="button" onclick="closeAssetPreview()" class="absolute top-2 right-2 z-10 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center">
+            <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+        <img id="asset-preview-img" src="" alt="预览" class="max-w-full max-h-[90vh] object-contain hidden">
+        <video id="asset-preview-video" src="" controls class="max-w-full max-h-[90vh] hidden"></video>
+    </div>
+</div>
+<script>
+function openAssetPreview(url, isVideo) {
+    var d = document.getElementById('asset-preview-dialog');
+    var img = document.getElementById('asset-preview-img');
+    var vid = document.getElementById('asset-preview-video');
+    img.classList.add('hidden');
+    vid.classList.add('hidden');
+    if (isVideo) {
+        vid.src = url;
+        vid.classList.remove('hidden');
+    } else {
+        img.src = url;
+        img.classList.remove('hidden');
+    }
+    d.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+function closeAssetPreview() {
+    var d = document.getElementById('asset-preview-dialog');
+    var img = document.getElementById('asset-preview-img');
+    var vid = document.getElementById('asset-preview-video');
+    d.classList.add('hidden');
+    img.src = '';
+    vid.src = '';
+    vid.pause();
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && !document.getElementById('asset-preview-dialog').classList.contains('hidden')) closeAssetPreview();
+});
+</script>
