@@ -71,7 +71,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 <input type="hidden" name="selected_category" id="selected_category" value="">
             </div>
 
-            <!-- Preview Media (上传到 OSS) -->
+            <!-- Preview Media（上传完成后才能发布） -->
             <div class="mb-4">
                 <label id="publish-media-label" class="block text-sm font-medium text-[#1A1A1A] mb-2">预览图</label>
                 <div class="flex gap-4 items-start">
@@ -86,7 +86,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                             <span class="text-xs text-[#999999]">点击上传</span>
                         </div>
                     </div>
-                    <div id="publish-media-hint" class="flex-1 text-xs text-[#666666]">支持 JPG、PNG、GIF、WebP，最大 5MB。将存储至阿里云 OSS。</div>
+                    <div id="publish-media-hint" class="flex-1 text-xs text-[#666666]">支持 JPG、PNG、GIF、WebP，最大 5MB。上传完成后可发布。</div>
                 </div>
                 <input type="hidden" name="image" id="publish-image-url" value="">
             </div>
@@ -114,10 +114,13 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 ></textarea>
             </div>
 
-            <!-- Publish Button -->
+            <!-- Publish Button（上传完成后才可点击） -->
             <button 
                 type="submit"
-                class="px-6 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors"
+                id="publish-submit-btn"
+                disabled
+                title="请先上传预览图/视频"
+                class="px-6 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 发布
             </button>
@@ -141,12 +144,16 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
             <p class="text-sm text-[#666666]">你还没有发布过模板。</p>
         <?php else: ?>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <?php foreach ($myPublishedTemplates as $tpl): ?>
-                    <div class="bg-[#FAFAFA] border border-[#EAEAEA] rounded-xl overflow-hidden">
+                <?php foreach ($myPublishedTemplates as $tpl): 
+                    $tplType = $tpl['type'] ?? 'image';
+                    $mediaUrl = (string)($tpl['image'] ?? '');
+                    $isPlaceholder = (strpos($mediaUrl, 'template-placeholder') !== false || $mediaUrl === '');
+                ?>
+                    <div class="bg-[#FAFAFA] border border-[#EAEAEA] rounded-xl overflow-hidden group" data-tpl-id="<?= (int)($tpl['id'] ?? 0) ?>" data-tpl-type="<?= htmlspecialchars($tplType) ?>">
                         <div class="relative aspect-[3/4] bg-[#F4F4F5]">
-                            <?php if (($tpl['type'] ?? 'image') === 'video'): ?>
+                            <?php if ($tplType === 'video' && $mediaUrl && !$isPlaceholder): ?>
                                 <video
-                                    src="<?= htmlspecialchars($tpl['image']) ?>"
+                                    src="<?= htmlspecialchars($mediaUrl) ?>"
                                     class="w-full h-full object-cover"
                                     muted
                                     playsinline
@@ -154,15 +161,15 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                                 ></video>
                             <?php else: ?>
                                 <img
-                                    src="<?= htmlspecialchars($tpl['image']) ?>"
+                                    src="<?= htmlspecialchars($mediaUrl ?: '/assets/images/template-placeholder.svg') ?>"
                                     alt="<?= htmlspecialchars($tpl['title']) ?>"
                                     class="w-full h-full object-cover"
                                     loading="lazy"
                                 />
                             <?php endif; ?>
                             <div class="absolute top-2 left-2 flex items-center gap-1">
-                                <span class="px-2 py-0.5 text-[10px] rounded text-white <?= ($tpl['type'] ?? 'image') === 'video' ? 'bg-purple-500/80' : 'bg-blue-500/80' ?>">
-                                    <?= ($tpl['type'] ?? 'image') === 'video' ? '视频' : '图片' ?>
+                                <span class="px-2 py-0.5 text-[10px] rounded text-white <?= $tplType === 'video' ? 'bg-purple-500/80' : 'bg-blue-500/80' ?>">
+                                    <?= $tplType === 'video' ? '视频' : '图片' ?>
                                 </span>
                                 <?php if (!empty($tpl['category'])): ?>
                                     <span class="px-2 py-0.5 text-[10px] rounded bg-black/45 text-white">
@@ -170,6 +177,13 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                                     </span>
                                 <?php endif; ?>
                             </div>
+                            <button
+                                type="button"
+                                onclick="openCoverDialog(<?= (int)($tpl['id'] ?? 0) ?>, '<?= htmlspecialchars($tplType) ?>')"
+                                class="absolute bottom-2 right-2 px-3 py-1.5 text-xs font-medium bg-black/60 hover:bg-black/80 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <?= $isPlaceholder ? '设置封面' : '更换封面' ?>
+                            </button>
                         </div>
                         <div class="p-3">
                             <p class="text-sm font-medium text-[#1A1A1A] mb-1 line-clamp-1"><?= htmlspecialchars($tpl['title']) ?></p>
@@ -179,6 +193,36 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- Cover Upload Dialog -->
+<div id="cover-dialog" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick="closeCoverDialog()">
+    <div class="bg-white rounded-lg max-w-md w-full mx-4" onclick="event.stopPropagation()">
+        <div class="px-6 py-4 border-b border-[#E5E5E5] flex items-center justify-between">
+            <h2 class="text-base font-medium text-[#1A1A1A]">设置封面</h2>
+            <button onclick="closeCoverDialog()" class="p-2 hover:bg-[#F5F5F5] rounded-lg">
+                <i data-lucide="x" class="w-5 h-5 text-[#666666]"></i>
+            </button>
+        </div>
+        <div class="p-6">
+            <p id="cover-dialog-hint" class="text-sm text-[#666666] mb-4">上传视频或图片作为模板封面</p>
+            <div
+                id="cover-upload-area"
+                class="w-full h-40 border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all"
+                onclick="document.getElementById('cover-file-input').click()"
+            >
+                <input type="file" id="cover-file-input" class="hidden" accept="image/*,video/*">
+                <div id="cover-preview" class="w-full h-full flex flex-col items-center justify-center p-2">
+                    <i data-lucide="upload" class="w-10 h-10 text-[#999999] mb-2"></i>
+                    <span class="text-sm text-[#666666]">点击上传封面</span>
+                </div>
+            </div>
+            <div class="mt-4 flex gap-2 justify-end">
+                <button type="button" onclick="closeCoverDialog()" class="px-4 py-2 text-sm text-[#666666] hover:bg-[#F5F5F5] rounded-lg">取消</button>
+                <button type="button" id="cover-submit-btn" onclick="submitCover()" disabled class="px-4 py-2 text-sm bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">确认</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -204,22 +248,177 @@ const imageModels = <?= json_encode($imageModels, JSON_UNESCAPED_UNICODE) ?>;
 const videoModels = <?= json_encode($videoModels, JSON_UNESCAPED_UNICODE) ?>;
 let publishSubmitting = false;
 
-function publishEscapeHtml(s) {
-    if (!s) return '';
-    const div = document.createElement('div');
-    div.textContent = String(s);
-    return div.innerHTML;
+let coverDialogTplId = 0;
+let coverDialogTplType = 'image';
+let coverDialogUploadedUrl = '';
+
+function openCoverDialog(tplId, tplType) {
+    coverDialogTplId = tplId;
+    coverDialogTplType = tplType || 'video';
+    coverDialogUploadedUrl = '';
+    document.getElementById('cover-dialog-hint').textContent = coverDialogTplType === 'video'
+        ? '上传视频或图片作为模板封面'
+        : '上传图片作为模板封面';
+    document.getElementById('cover-file-input').accept = coverDialogTplType === 'video'
+        ? 'image/*,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/mpeg'
+        : 'image/*';
+    document.getElementById('cover-preview').innerHTML = '<i data-lucide="upload" class="w-10 h-10 text-[#999999] mb-2"></i><span class="text-sm text-[#666666]">点击上传封面</span>';
+    document.getElementById('cover-submit-btn').disabled = true;
+    document.getElementById('cover-dialog').classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-function publishSanitizeMediaUrl(url) {
-    const raw = String(url || '').trim();
-    if (!raw) return '';
+function closeCoverDialog() {
+    document.getElementById('cover-dialog').classList.add('hidden');
+    coverDialogTplId = 0;
+    coverDialogUploadedUrl = '';
+}
+
+document.getElementById('cover-file-input').addEventListener('change', async function() {
+    const file = this.files[0];
+    if (!file) return;
+    const isVideo = coverDialogTplType === 'video' && file.type.startsWith('video/');
+    const preview = document.getElementById('cover-preview');
+    preview.innerHTML = '<span class="text-sm text-[#3B82F6]">上传中...</span>';
+    document.getElementById('cover-submit-btn').disabled = true;
     try {
-        const parsed = new URL(raw, window.location.origin);
-        if (!['http:', 'https:'].includes(parsed.protocol)) return '';
-        return parsed.href;
-    } catch (e) {
-        return '';
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('prefix', isVideo ? 'assets/videos/templates' : 'assets/images/templates');
+        const endpoint = isVideo ? 'api/upload/video.php' : 'api/upload/image.php';
+        const res = await fetch(endpoint, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success && data.data?.url) {
+            const url = String(data.data.url || '').trim();
+            if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                coverDialogUploadedUrl = url;
+                preview.innerHTML = '';
+                if (isVideo) {
+                    const v = document.createElement('video');
+                    v.src = url;
+                    v.controls = true;
+                    v.muted = true;
+                    v.playsInline = true;
+                    v.className = 'max-w-full max-h-full object-contain';
+                    preview.appendChild(v);
+                } else {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = '预览';
+                    img.className = 'max-w-full max-h-full object-contain';
+                    preview.appendChild(img);
+                }
+                document.getElementById('cover-submit-btn').disabled = false;
+            } else {
+                preview.innerHTML = '<span class="text-sm text-red-500">返回地址无效</span>';
+            }
+        } else {
+            preview.innerHTML = '<span class="text-sm text-red-500">' + (data.message || '上传失败') + '</span>';
+        }
+    } catch (err) {
+        preview.innerHTML = '<span class="text-sm text-red-500">上传失败</span>';
+    }
+});
+
+async function submitCover() {
+    if (!coverDialogUploadedUrl || coverDialogTplId <= 0) return;
+    const btn = document.getElementById('cover-submit-btn');
+    btn.disabled = true;
+    btn.textContent = '保存中...';
+    try {
+        const res = await fetch('api/publish/update_cover.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: coverDialogTplId, image: coverDialogUploadedUrl }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            closeCoverDialog();
+            location.reload();
+        } else {
+            alert('更新失败：' + (data.message || '未知错误'));
+        }
+    } catch (err) {
+        alert('请求失败，请稍后重试');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '确认';
+    }
+}
+
+function resetPublishMediaPreview() {
+    document.getElementById('publish-image-url').value = '';
+    document.getElementById('publish-image-input').value = '';
+    const contentType = document.getElementById('content_type').value;
+    const preview = document.getElementById('publish-image-preview');
+    preview.innerHTML = contentType === 'video'
+        ? '<i data-lucide="video" class="w-8 h-8 text-[#999999] mb-1"></i><span class="text-xs text-[#999999]">点击上传</span>'
+        : '<i data-lucide="image-plus" class="w-8 h-8 text-[#999999] mb-1"></i><span class="text-xs text-[#999999]">点击上传</span>';
+    document.getElementById('publish-submit-btn').disabled = true;
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function updatePublishMediaUploaderByType(type) {
+    const isVideo = type === 'video';
+    document.getElementById('publish-media-label').textContent = isVideo ? '预览视频' : '预览图';
+    document.getElementById('publish-media-hint').textContent = isVideo
+        ? '支持 MP4、WebM、MOV、AVI、MPEG，最大 200MB。上传完成后可发布。'
+        : '支持 JPG、PNG、GIF、WebP，最大 5MB。上传完成后可发布。';
+    document.getElementById('publish-image-input').accept = isVideo
+        ? 'video/mp4,video/webm,video/quicktime,video/x-msvideo,video/mpeg,.mp4,.webm,.mov,.avi,.mpeg,.mpg'
+        : 'image/*';
+}
+
+async function handlePublishMediaUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const contentType = document.getElementById('content_type').value;
+    const isVideo = contentType === 'video';
+    if (isVideo && !file.type.startsWith('video/')) return;
+    if (!isVideo && !file.type.startsWith('image/')) return;
+
+    const preview = document.getElementById('publish-image-preview');
+    preview.innerHTML = '<span class="text-xs text-[#3B82F6]">上传中...</span>';
+    document.getElementById('publish-submit-btn').disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('prefix', isVideo ? 'assets/videos/templates' : 'assets/images/templates');
+        const endpoint = isVideo ? 'api/upload/video.php' : 'api/upload/image.php';
+        const res = await fetch(endpoint, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success && data.data?.url) {
+            const url = String(data.data.url || '').trim();
+            if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+                document.getElementById('publish-image-url').value = url;
+                preview.innerHTML = '';
+                if (isVideo) {
+                    const v = document.createElement('video');
+                    v.src = url;
+                    v.className = 'w-full h-full object-cover';
+                    v.controls = true;
+                    v.muted = true;
+                    v.playsInline = true;
+                    v.preload = 'metadata';
+                    preview.appendChild(v);
+                } else {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = '预览';
+                    img.className = 'w-full h-full object-cover';
+                    preview.appendChild(img);
+                }
+                document.getElementById('publish-submit-btn').disabled = false;
+            } else {
+                preview.innerHTML = '<span class="text-xs text-red-500">返回地址无效</span>';
+            }
+        } else {
+            preview.innerHTML = '<span class="text-xs text-red-500">' + (data.message || '上传失败') + '</span>';
+        }
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    } catch (err) {
+        preview.innerHTML = '<span class="text-xs text-red-500">上传失败</span>';
     }
 }
 
@@ -229,7 +428,9 @@ function setContentType(type) {
     document.getElementById('selected-model-display').textContent = '请选择模型';
     document.getElementById('selected-model-display').classList.remove('text-[#1A1A1A]');
     document.getElementById('selected-model-display').classList.add('text-[#999999]');
-    
+    resetPublishMediaPreview();
+    updatePublishMediaUploaderByType(type);
+
     if (type === 'image') {
         document.getElementById('btn-image').classList.remove('bg-[#F5F5F5]', 'text-[#666666]');
         document.getElementById('btn-image').classList.add('bg-[#3B82F6]', 'text-white');
@@ -241,8 +442,6 @@ function setContentType(type) {
         document.getElementById('btn-image').classList.remove('bg-[#3B82F6]', 'text-white');
         document.getElementById('btn-image').classList.add('bg-[#F5F5F5]', 'text-[#666666]');
     }
-    resetPublishMediaPreview();
-    updatePublishMediaUploaderByType(type);
 }
 
 function setCategory(category) {
@@ -304,81 +503,6 @@ function selectPublishModel(modelId, modelName) {
     closePublishModelDialog();
 }
 
-function getPublishMediaEmptyState(type) {
-    if (type === 'video') {
-        return '<i data-lucide="video" class="w-8 h-8 text-[#999999] mb-1"></i><span class="text-xs text-[#999999]">点击上传</span>';
-    }
-    return '<i data-lucide="image-plus" class="w-8 h-8 text-[#999999] mb-1"></i><span class="text-xs text-[#999999]">点击上传</span>';
-}
-
-function resetPublishMediaPreview() {
-    const contentType = document.getElementById('content_type').value;
-    const preview = document.getElementById('publish-image-preview');
-    const hiddenInput = document.getElementById('publish-image-url');
-    const fileInput = document.getElementById('publish-image-input');
-    if (hiddenInput) hiddenInput.value = '';
-    if (fileInput) fileInput.value = '';
-    if (preview) preview.innerHTML = getPublishMediaEmptyState(contentType);
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-
-function updatePublishMediaUploaderByType(type) {
-    const normalizedType = type === 'video' ? 'video' : 'image';
-    const label = document.getElementById('publish-media-label');
-    const hint = document.getElementById('publish-media-hint');
-    const fileInput = document.getElementById('publish-image-input');
-    if (label) label.textContent = normalizedType === 'video' ? '预览视频' : '预览图';
-    if (hint) {
-        hint.textContent = normalizedType === 'video'
-            ? '支持 MP4、WebM、MOV、AVI、MPEG，最大 200MB。将存储至阿里云 OSS。'
-            : '支持 JPG、PNG、GIF、WebP，最大 5MB。将存储至阿里云 OSS。';
-    }
-    if (fileInput) {
-        fileInput.accept = normalizedType === 'video'
-            ? 'video/mp4,video/webm,video/quicktime,video/x-msvideo,video/mpeg,.mp4,.webm,.mov,.avi,.mpeg,.mpg'
-            : 'image/*';
-    }
-}
-
-async function handlePublishMediaUpload(input) {
-    const file = input.files[0];
-    const contentType = document.getElementById('content_type').value === 'video' ? 'video' : 'image';
-    if (!file) return;
-    if (contentType === 'image' && !file.type.startsWith('image/')) return;
-    if (contentType === 'video' && !file.type.startsWith('video/')) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('prefix', contentType === 'video' ? 'assets/videos/templates' : 'assets/images/templates');
-    try {
-        const preview = document.getElementById('publish-image-preview');
-        preview.innerHTML = '<span class="text-xs text-[#3B82F6]">上传中...</span>';
-        const uploadEndpoint = contentType === 'video' ? 'api/upload/video.php' : 'api/upload/image.php';
-        const res = await fetch(uploadEndpoint, {
-            method: 'POST',
-            body: formData
-        });
-        const data = await res.json();
-        if (data.success && data.data?.url) {
-            const safeUrl = publishSanitizeMediaUrl(data.data.url);
-            if (!safeUrl) {
-                preview.innerHTML = '<span class="text-xs text-red-500">返回地址无效</span>';
-                return;
-            }
-            document.getElementById('publish-image-url').value = safeUrl;
-            if (contentType === 'video') {
-                preview.innerHTML = `<video src="${safeUrl}" class="w-full h-full object-cover" controls muted playsinline preload="metadata"></video>`;
-            } else {
-                preview.innerHTML = `<img src="${safeUrl}" alt="预览" class="w-full h-full object-cover" />`;
-            }
-        } else {
-            preview.innerHTML = '<span class="text-xs text-red-500">' + publishEscapeHtml(data.message || '上传失败') + '</span>';
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-        }
-    } catch (err) {
-        document.getElementById('publish-image-preview').innerHTML = '<span class="text-xs text-red-500">上传失败</span>';
-    }
-}
-
 async function handlePublishSubmit(e) {
     e.preventDefault();
     if (publishSubmitting) return false;
@@ -426,6 +550,8 @@ async function handlePublishSubmit(e) {
             document.getElementById('selected-model-display').textContent = '请选择模型';
             document.getElementById('selected-model-display').classList.add('text-[#999999]');
             resetPublishMediaPreview();
+            updatePublishMediaUploaderByType(document.getElementById('content_type').value);
+            location.reload();
         } else {
             alert('发布失败：' + (data.message || '未知错误'));
         }
@@ -435,15 +561,15 @@ async function handlePublishSubmit(e) {
     } finally {
         publishSubmitting = false;
         if (submitBtn) {
-            submitBtn.disabled = false;
+            submitBtn.disabled = !document.getElementById('publish-image-url').value.trim();
             submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-            submitBtn.textContent = '发布模板';
+            submitBtn.textContent = '发布';
         }
     }
     return false;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function() {
     updatePublishMediaUploaderByType(document.getElementById('content_type').value || 'image');
 });
 </script>
