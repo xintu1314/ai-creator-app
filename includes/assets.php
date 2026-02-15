@@ -51,13 +51,18 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
         </div>
     <?php elseif (count($filteredHistory) > 0): ?>
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            <?php foreach ($filteredHistory as $item): ?>
-                <div class="group cursor-pointer bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
-                    <div class="relative aspect-[3/4] bg-[#F7F7F7] asset-media-wrap">
-                        <?php if (($item['type'] ?? '') === 'video'): ?>
+            <?php foreach ($filteredHistory as $item): 
+                $mediaUrl = htmlspecialchars((string)($item['image'] ?? ''));
+                $isVideo = ($item['type'] ?? '') === 'video';
+                $ext = $isVideo ? 'mp4' : 'jpg';
+                $downloadName = ($item['type'] ?? 'file') . '-' . ($item['id'] ?? '') . '.' . $ext;
+            ?>
+                <div class="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
+                    <div class="relative aspect-[3/4] bg-[#F7F7F7] asset-media-wrap cursor-pointer" data-asset-url="<?= $mediaUrl ?>" onclick="var u=this.getAttribute('data-asset-url');if(u)window.open(u,'_blank','noopener')">
+                        <?php if ($isVideo): ?>
                             <video
-                                src="<?= htmlspecialchars($item['image']) ?>"
-                                class="w-full h-full object-cover"
+                                src="<?= $mediaUrl ?>"
+                                class="w-full h-full object-cover pointer-events-none"
                                 muted
                                 playsinline
                                 preload="metadata"
@@ -65,9 +70,9 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
                             ></video>
                         <?php else: ?>
                             <img
-                                src="<?= htmlspecialchars($item['image']) ?>"
+                                src="<?= $mediaUrl ?>"
                                 alt="<?= htmlspecialchars($item['title']) ?>"
-                                class="w-full h-full object-cover"
+                                class="w-full h-full object-cover pointer-events-none"
                                 loading="lazy"
                                 onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div class=&quot;w-full h-full flex items-center justify-center text-xs text-[#999999]&quot;>图片资源已失效</div>');"
                             />
@@ -76,6 +81,14 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
                             <span class="px-2 py-0.5 text-[10px] rounded backdrop-blur-sm text-white <?= $item['type'] === 'image' ? 'bg-blue-500/80' : 'bg-purple-500/80' ?>">
                                 <?= $item['type'] === 'image' ? '图片' : '视频' ?>
                             </span>
+                        </div>
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                            <a href="<?= $mediaUrl ?>" target="_blank" rel="noopener" class="h-9 px-3 rounded-lg bg-white/90 hover:bg-white text-sm font-medium text-[#1A1A1A] flex items-center gap-1.5" onclick="event.stopPropagation()">
+                                <i data-lucide="external-link" class="w-4 h-4"></i>查看
+                            </a>
+                            <a href="<?= $mediaUrl ?>" download="<?= htmlspecialchars($downloadName) ?>" class="h-9 px-3 rounded-lg bg-white/90 hover:bg-white text-sm font-medium text-[#1A1A1A] flex items-center gap-1.5" onclick="event.stopPropagation()">
+                                <i data-lucide="download" class="w-4 h-4"></i>下载
+                            </a>
                         </div>
                     </div>
                     <div class="p-3">
