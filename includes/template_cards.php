@@ -14,11 +14,18 @@
     <!-- Cards Grid - Horizontal Scroll -->
     <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-hide" id="template-cards-container">
         <?php foreach ($templates as $template): ?>
+            <?php
+            $mediaUrl = (string)($template['image'] ?? '');
+            $isVideoType = (($template['type'] ?? 'image') === 'video');
+            // Some seeds store thumbnail images for video templates. Only render <video> when it's a real video URL.
+            $looksLikeVideo = $mediaUrl !== '' && preg_match('/\.(mp4|webm|mov|m3u8)(\?|$)/i', $mediaUrl);
+            $renderAsVideo = $isVideoType && $looksLikeVideo;
+            ?>
             <div class="flex-shrink-0 w-[160px] group template-card" data-template-id="<?= $template['id'] ?>">
                 <div class="relative w-full h-[200px] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-md group-hover:shadow-lg group-hover:-translate-y-1">
-                    <?php if (($template['type'] ?? 'image') === 'video'): ?>
+                    <?php if ($renderAsVideo): ?>
                         <video
-                            src="<?= htmlspecialchars($template['image']) ?>"
+                            src="<?= htmlspecialchars($mediaUrl) ?>"
                             class="w-full h-full object-cover"
                             muted
                             playsinline
@@ -26,7 +33,7 @@
                         ></video>
                     <?php else: ?>
                         <img
-                            src="<?= htmlspecialchars($template['image']) ?>"
+                            src="<?= htmlspecialchars($mediaUrl) ?>"
                             alt="<?= htmlspecialchars($template['title']) ?>"
                             class="w-full h-full object-cover"
                         />

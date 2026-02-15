@@ -5,6 +5,15 @@
 
 require_once __DIR__ . '/db.php';
 
+function auth_set_session_error(string $message): void {
+    $GLOBALS['__auth_session_error'] = $message;
+}
+
+function auth_get_session_error(): ?string {
+    $msg = $GLOBALS['__auth_session_error'] ?? null;
+    return is_string($msg) && trim($msg) !== '' ? $msg : null;
+}
+
 function auth_ensure_user_admin_columns(): void {
     static $ensured = false;
     if ($ensured) return;
@@ -21,7 +30,41 @@ function auth_ensure_user_admin_columns(): void {
 
 function auth_boot_session(): void {
     if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+        // Some production environments have an unwritable session.save_path.
+        // Fix it proactively to avoid "login works but API still 401" (session not persisted).
+        $handler = strtolower((string)ini_get('session.save_handler'));
+        if ($handler === 'files') {
+            $rawSavePath = (string)session_save_path();
+            if ($rawSavePath === '') {
+                $rawSavePath = (string)ini_get('session.save_path');
+            }
+            // session.save_path may contain "N;/path" format, take last segment.
+            $savePath = $rawSavePath;
+            if (strpos($savePath, ';') !== false) {
+                $savePath = (string)substr($savePath, strrpos($savePath, ';') + 1);
+            }
+            $savePath = trim($savePath);
+            if ($savePath === '' || !is_dir($savePath) || !is_writable($savePath)) {
+                $fallback = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'php_sessions';
+                if (!is_dir($fallback)) {
+                    @mkdir($fallback, 0777, true);
+                }
+                if (is_dir($fallback) && is_writable($fallback)) {
+                    session_save_path($fallback);
+                }
+            }
+        }
+
+        // Suppress warnings (they break JSON responses) and store a readable error.
+        $ok = @session_start();
+        if (!$ok && session_status() !== PHP_SESSION_ACTIVE) {
+            $err = error_get_last();
+            $msg = 'Session 启动失败';
+            if (is_array($err) && !empty($err['message'])) {
+                $msg .= '：' . (string)$err['message'];
+            }
+            auth_set_session_error($msg);
+        }
     }
 }
 

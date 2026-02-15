@@ -40,6 +40,12 @@
         <div class="flex-1 overflow-y-auto p-4 min-h-0">
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" id="template-grid">
                 <?php foreach ($templates as $template): ?>
+                    <?php
+                    $mediaUrl = (string)($template['image'] ?? '');
+                    $isVideoType = (($template['type'] ?? 'image') === 'video');
+                    $looksLikeVideo = $mediaUrl !== '' && preg_match('/\.(mp4|webm|mov|m3u8)(\?|$)/i', $mediaUrl);
+                    $renderAsVideo = $isVideoType && $looksLikeVideo;
+                    ?>
                     <div
                         class="group cursor-pointer template-item"
                         data-template-id="<?= $template['id'] ?>"
@@ -47,9 +53,9 @@
                         onclick="useTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>); closeTemplateSheet();"
                     >
                         <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-lg transition-all duration-300 aspect-[3/4]">
-                            <?php if (($template['type'] ?? 'image') === 'video'): ?>
+                            <?php if ($renderAsVideo): ?>
                                 <video
-                                    src="<?= htmlspecialchars($template['image']) ?>"
+                                    src="<?= htmlspecialchars($mediaUrl) ?>"
                                     class="w-full h-full object-cover"
                                     muted
                                     playsinline
@@ -57,7 +63,7 @@
                                 ></video>
                             <?php else: ?>
                                 <img
-                                    src="<?= htmlspecialchars($template['image']) ?>"
+                                    src="<?= htmlspecialchars($mediaUrl) ?>"
                                     alt="<?= htmlspecialchars($template['title']) ?>"
                                     class="w-full h-full object-cover"
                                 />

@@ -78,9 +78,16 @@ $filteredTemplates = $selectedCategory === '全部'
                     onclick="useTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>)"
                 >
                     <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-lg transition-all duration-300 aspect-[3/4]">
-                        <?php if (($template['type'] ?? 'image') === 'video'): ?>
+                        <?php
+                        $mediaUrl = (string)($template['image'] ?? '');
+                        $isVideoType = (($template['type'] ?? 'image') === 'video');
+                        // Video templates may store a thumbnail image URL. Only use <video> for real video URLs.
+                        $looksLikeVideo = $mediaUrl !== '' && preg_match('/\.(mp4|webm|mov|m3u8)(\?|$)/i', $mediaUrl);
+                        $renderAsVideo = $isVideoType && $looksLikeVideo;
+                        ?>
+                        <?php if ($renderAsVideo): ?>
                             <video
-                                src="<?= htmlspecialchars($template['image']) ?>"
+                                src="<?= htmlspecialchars($mediaUrl) ?>"
                                 class="w-full h-full object-cover"
                                 muted
                                 playsinline
@@ -88,7 +95,7 @@ $filteredTemplates = $selectedCategory === '全部'
                             ></video>
                         <?php else: ?>
                             <img
-                                src="<?= htmlspecialchars($template['image']) ?>"
+                                src="<?= htmlspecialchars($mediaUrl) ?>"
                                 alt="<?= htmlspecialchars($template['title']) ?>"
                                 class="w-full h-full object-cover"
                             />

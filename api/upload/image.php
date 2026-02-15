@@ -19,7 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-if (auth_get_current_user_id() <= 0) {
+$uid = auth_get_current_user_id();
+if ($uid <= 0) {
+    $sessErr = function_exists('auth_get_session_error') ? auth_get_session_error() : null;
+    if ($sessErr) {
+        json_error('登录状态异常：' . $sessErr . '（请检查 PHP session.save_path 权限/磁盘）', 500);
+        exit;
+    }
     json_error('请先登录', 401);
     exit;
 }
@@ -45,7 +51,13 @@ if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
             UPLOAD_ERR_CANT_WRITE => '无法写入磁盘',
             UPLOAD_ERR_EXTENSION  => '扩展阻止了上传',
         ];
-        $msg = $errors[$_FILES['file']['error']] ?? '上传错误码: ' . $_FILES['file']['error'];
+        $errCode = (int)$_FILES['file']['error'];
+        $msg = $errors[$errCode] ?? ('上传错误码: ' . $errCode);
+        // 补充 php.ini 限制信息，方便线上定位（不包含敏感信息）
+        if (in_array($errCode, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            $msg .= '（upload_max_filesize=' . (ini_get('upload_max_filesize') ?: '-') .
+                ', post_max_size=' . (ini_get('post_max_size') ?: '-') . '）';
+        }
     }
     json_error($msg);
     exit;
@@ -53,10 +65,26 @@ if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
 
 $file = $_FILES['file'];
 $tmpPath = $file['tmp_name'];
-$mimeType = $file['type'] ?? '';
+// MIME 以服务端检测为准，避免线上某些环境 $file['type'] 为空/不准
+$browserMime = trim((string)($file['type'] ?? ''));
+$mimeType = $browserMime;
+if (function_exists('finfo_open')) {
+    $finfo = @finfo_open(FILEINFO_MIME_TYPE);
+    if ($finfo) {
+        $detected = @finfo_file($finfo, $tmpPath);
+        @finfo_close($finfo);
+        if (is_string($detected) && $detected !== '') {
+            $mimeType = strtolower(trim($detected));
+        }
+    }
+}
+$mimeType = strtolower(trim((string)$mimeType));
 
 if (!isset($allowedTypes[$mimeType])) {
-    json_error('仅支持 JPG、PNG、GIF、WebP 格式');
+    $extra = $browserMime && strtolower($browserMime) !== $mimeType
+        ? ('（浏览器: ' . $browserMime . '，服务端: ' . $mimeType . '）')
+        : ($mimeType ? ('（MIME: ' . $mimeType . '）') : '');
+    json_error('仅支持 JPG、PNG、GIF、WebP 格式' . $extra);
     exit;
 }
 
@@ -78,5 +106,7 @@ $url = oss_upload_file($tmpPath, $objectKey, $mimeType);
 if ($url) {
     json_success(['url' => $url], '上传成功');
 } else {
-    json_error('上传失败，请检查 OSS 配置', 500);
+    $detail = oss_get_last_error();
+    $msg = $detail ? ('上传失败：' . $detail) : '上传失败，请检查 OSS 配置';
+    json_error($msg, 500);
 }

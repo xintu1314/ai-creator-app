@@ -5,6 +5,22 @@
  */
 
 /**
+ * 保存最近一次 OSS 错误（便于 API 端返回可读信息，不暴露密钥）
+ */
+function oss_set_last_error(string $message): void {
+    $GLOBALS['__oss_last_error'] = $message;
+}
+
+function oss_get_last_error(): ?string {
+    $msg = $GLOBALS['__oss_last_error'] ?? null;
+    return is_string($msg) && trim($msg) !== '' ? $msg : null;
+}
+
+function oss_clear_last_error(): void {
+    unset($GLOBALS['__oss_last_error']);
+}
+
+/**
  * 上传本地文件到 OSS
  * @param string $tmpPath 本地临时文件路径（如 $_FILES['file']['tmp_name']）
  * @param string $objectKey OSS 对象路径，如 assets/images/2025/02/10/uuid.jpg
@@ -12,8 +28,11 @@
  * @return string|null 成功返回公网可访问的 URL，失败返回 null
  */
 function oss_upload_file(string $tmpPath, string $objectKey, ?string $contentType = null): ?string {
+    oss_clear_last_error();
     $config = require __DIR__ . '/../config/oss.php';
     if (empty($config['access_key_id']) || empty($config['access_key_secret']) || empty($config['bucket'])) {
+        $msg = 'OSS 配置缺失：需要 OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET / OSS_BUCKET';
+        oss_set_last_error($msg);
         error_log('OSS config incomplete: access_key_id, access_key_secret, bucket are required');
         return null;
     }
@@ -24,12 +43,22 @@ function oss_upload_file(string $tmpPath, string $objectKey, ?string $contentTyp
     putenv('OSS_ACCESS_KEY_SECRET=' . $config['access_key_secret']);
 
     if (!file_exists($tmpPath)) {
+        $msg = '上传临时文件不存在（服务器可能限制了上传临时目录）';
+        oss_set_last_error($msg);
         error_log('OSS upload: file not exists ' . $tmpPath);
         return null;
     }
 
     try {
-        require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
+        $autoload = dirname(__DIR__, 2) . '/vendor/autoload.php';
+        if (!file_exists($autoload)) {
+            // 线上常见：只传了源码，没跑 composer install
+            $msg = 'OSS SDK 未安装：缺少 vendor/autoload.php（请在服务器执行 composer install --no-dev）';
+            oss_set_last_error($msg);
+            error_log('OSS upload: missing vendor/autoload.php at ' . $autoload);
+            return null;
+        }
+        require_once $autoload;
 
         $credentialsProvider = new \AlibabaCloud\Oss\V2\Credentials\EnvironmentVariableCredentialsProvider();
         $cfg = \AlibabaCloud\Oss\V2\Config::loadDefault();
@@ -58,6 +87,9 @@ function oss_upload_file(string $tmpPath, string $objectKey, ?string $contentTyp
         $endpoint = $config['endpoint'] ?: 'oss-' . $config['region'] . '.aliyuncs.com';
         return sprintf('https://%s.%s/%s', $config['bucket'], $endpoint, ltrim($objectKey, '/'));
     } catch (Throwable $e) {
+        // 只返回安全的摘要信息，避免泄漏敏感配置
+        $msg = 'OSS 上传异常：' . $e->getMessage();
+        oss_set_last_error($msg);
         error_log('OSS upload error: ' . $e->getMessage());
         return null;
     }

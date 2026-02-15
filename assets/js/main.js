@@ -684,8 +684,17 @@ async function handleFrameUpload(inputOrFile, previewId, frameType) {
     formData.append('prefix', 'assets/images/frames');
     try {
         const res = await fetch('api/upload/image.php', { method: 'POST', body: formData });
-        const data = await res.json();
-        if (data.success && data.data?.url) {
+        const raw = await res.text();
+        let data = null;
+        try { data = JSON.parse(raw); } catch (e) { /* ignore */ }
+
+        if (!res.ok) {
+            const msg = (data && data.message) ? data.message : (`上传失败（HTTP ${res.status}）`);
+            if (preview) preview.innerHTML = '<span class="text-xs text-red-500">' + escapeHtml(msg) + '</span>';
+            return;
+        }
+
+        if (data && data.success && data.data?.url) {
             const safeUrl = sanitizeMediaUrl(data.data.url);
             if (!safeUrl) {
                 if (preview) preview.innerHTML = '<span class="text-xs text-red-500">返回地址无效</span>';
@@ -695,7 +704,8 @@ async function handleFrameUpload(inputOrFile, previewId, frameType) {
             window.frameUrls[frameType] = safeUrl;
             if (preview) preview.innerHTML = `<img src="${safeUrl}" alt="${escapeHtml(frameType)}" class="w-full h-full object-cover rounded-lg" />`;
         } else {
-            if (preview) preview.innerHTML = '<span class="text-xs text-red-500">' + escapeHtml(data.message || '上传失败') + '</span>';
+            const msg = (data && data.message) ? data.message : '上传失败（返回非 JSON 或空响应）';
+            if (preview) preview.innerHTML = '<span class="text-xs text-red-500">' + escapeHtml(msg) + '</span>';
         }
     } catch (err) {
         if (preview) preview.innerHTML = '<span class="text-xs text-red-500">上传失败</span>';
@@ -719,18 +729,35 @@ async function handleRefImagesUpload(inputOrFiles) {
         formData.append('prefix', 'assets/images/references');
         try {
             const res = await fetch('api/upload/image.php', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success && data.data?.url) {
+            const raw = await res.text();
+            let data = null;
+            try { data = JSON.parse(raw); } catch (e) { /* ignore */ }
+
+            if (!res.ok) {
+                const msg = (data && data.message) ? data.message : (`参考图上传失败（HTTP ${res.status}）`);
+                showInlineNotice(msg, 'error');
+                continue;
+            }
+
+            if (data && data.success && data.data?.url) {
                 const safeUrl = sanitizeMediaUrl(data.data.url);
-                if (!safeUrl) continue;
+                if (!safeUrl) {
+                    showInlineNotice('参考图上传失败：返回地址无效', 'error');
+                    continue;
+                }
                 window.referenceImageUrls.push(safeUrl);
                 const div = document.createElement('div');
                 div.className = 'relative w-[60px] h-[60px] rounded-lg overflow-hidden flex-shrink-0 group';
                 div.dataset.url = safeUrl;
                 div.innerHTML = `<img src="${safeUrl}" alt="参考" class="w-full h-full object-cover" /><button type="button" onclick="removeRefImage(this)" class="absolute top-0 right-0 w-5 h-5 bg-black/60 text-white text-xs rounded-bl flex items-center justify-center opacity-0 group-hover:opacity-100">×</button>`;
                 if (preview) preview.appendChild(div);
+            } else {
+                const msg = (data && data.message) ? data.message : '参考图上传失败（返回非 JSON 或空响应）';
+                showInlineNotice(msg, 'error');
             }
-        } catch (e) { /* skip */ }
+        } catch (e) {
+            showInlineNotice('参考图上传失败：网络异常', 'error');
+        }
     }
     if (inputOrFiles && !Array.isArray(inputOrFiles) && inputOrFiles.value !== undefined) inputOrFiles.value = '';
 }

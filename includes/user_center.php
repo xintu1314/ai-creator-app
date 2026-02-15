@@ -186,11 +186,17 @@ if ($currentUserId > 0) {
                 <?php else: ?>
                     <div class="grid grid-cols-3 gap-2">
                         <?php foreach ($myTemplates as $tpl): ?>
+                            <?php
+                            $mediaUrl = (string)($tpl['image'] ?? '');
+                            $isVideoType = (($tpl['type'] ?? 'image') === 'video');
+                            $looksLikeVideo = $mediaUrl !== '' && preg_match('/\.(mp4|webm|mov|m3u8)(\?|$)/i', $mediaUrl);
+                            $renderAsVideo = $isVideoType && $looksLikeVideo;
+                            ?>
                             <div class="rounded-lg overflow-hidden border border-[#EFEFEF] bg-[#FAFAFA]">
-                                <?php if (($tpl['type'] ?? 'image') === 'video'): ?>
-                                    <video src="<?= htmlspecialchars((string)($tpl['image'] ?? '')) ?>" class="w-full aspect-[3/4] object-cover" muted playsinline preload="metadata"></video>
+                                <?php if ($renderAsVideo): ?>
+                                    <video src="<?= htmlspecialchars($mediaUrl) ?>" class="w-full aspect-[3/4] object-cover" muted playsinline preload="metadata"></video>
                                 <?php else: ?>
-                                    <img src="<?= htmlspecialchars((string)($tpl['image'] ?? '')) ?>" alt="<?= htmlspecialchars((string)($tpl['title'] ?? '')) ?>" class="w-full aspect-[3/4] object-cover" loading="lazy" />
+                                    <img src="<?= htmlspecialchars($mediaUrl) ?>" alt="<?= htmlspecialchars((string)($tpl['title'] ?? '')) ?>" class="w-full aspect-[3/4] object-cover" loading="lazy" />
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
