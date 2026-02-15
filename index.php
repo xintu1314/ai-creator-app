@@ -1,7 +1,8 @@
 <?php
-session_start();
-
 require_once __DIR__ . '/api/common/auth.php';
+// 统一 Session 启动逻辑（含 save_path fallback），避免页面与 /api 登录态不一致
+auth_boot_session();
+
 require_once __DIR__ . '/api/common/points.php';
 require_once __DIR__ . '/api/data/models.php';
 require_once __DIR__ . '/api/data/templates.php';
