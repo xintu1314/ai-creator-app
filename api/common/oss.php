@@ -37,11 +37,6 @@ function oss_upload_file(string $tmpPath, string $objectKey, ?string $contentTyp
         return null;
     }
 
-    // 从配置设置环境变量，供 EnvironmentVariableCredentialsProvider 读取
-    // OSS SDK 使用 OSS_ACCESS_KEY_ID、OSS_ACCESS_KEY_SECRET（见 README-CN.md）
-    putenv('OSS_ACCESS_KEY_ID=' . $config['access_key_id']);
-    putenv('OSS_ACCESS_KEY_SECRET=' . $config['access_key_secret']);
-
     if (!file_exists($tmpPath)) {
         $msg = '上传临时文件不存在（服务器可能限制了上传临时目录）';
         oss_set_last_error($msg);
@@ -60,7 +55,11 @@ function oss_upload_file(string $tmpPath, string $objectKey, ?string $contentTyp
         }
         require_once $autoload;
 
-        $credentialsProvider = new \AlibabaCloud\Oss\V2\Credentials\EnvironmentVariableCredentialsProvider();
+        // 线上常见环境会禁用 putenv()，因此不要依赖环境变量提供凭证。
+        $credentialsProvider = new \AlibabaCloud\Oss\V2\Credentials\StaticCredentialsProvider(
+            (string)$config['access_key_id'],
+            (string)$config['access_key_secret']
+        );
         $cfg = \AlibabaCloud\Oss\V2\Config::loadDefault();
         $cfg->setCredentialsProvider($credentialsProvider);
         $cfg->setRegion($config['region']);
