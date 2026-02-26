@@ -202,6 +202,14 @@ button:active {
     display: none;
 }
 
+/* 生成中 loading 旋转动效（确保始终可见） */
+@keyframes gen-spin {
+  to { transform: rotate(360deg); }
+}
+.gen-loading-spinner {
+  animation: gen-spin 1s linear infinite;
+}
+
 /* 生成进度条动画 */
 @keyframes progress-indeterminate {
     0%   { transform: translateX(-100%); }

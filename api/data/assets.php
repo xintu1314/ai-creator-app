@@ -20,7 +20,7 @@ function get_assets($filter = 'all', $page = 1, $limit = 50, $userId = 0) {
         $sql .= " AND type = :type";
         $params['type'] = 'video';
     }
-    $sql .= " ORDER BY created_at DESC";
+    $sql .= " ORDER BY created_at ASC";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);

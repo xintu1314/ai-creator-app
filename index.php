@@ -17,7 +17,7 @@ $creationType = $_GET['type'] ?? 'image';
 // 从共享数据层加载（与 API 同源）
 $imageTemplates = get_templates('image');
 $videoTemplates = get_templates('video');
-$templates = $creationType === 'image' ? $imageTemplates : $videoTemplates;
+$templates = array_merge($imageTemplates, $videoTemplates);
 
 $imageModels = get_models('image');
 $videoModels = get_models('video');
@@ -25,6 +25,7 @@ $categories = get_categories();
 $currentModel = ($creationType === 'video' ? $videoModels : $imageModels)[0] ?? null;
 $currentUser = auth_get_current_user();
 $pointsSummary = !empty($currentUser['id']) ? points_get_wallet_summary((int)$currentUser['id']) : null;
+$assetHistory = !empty($currentUser['id']) ? get_assets('all', 1, 50, (int)$currentUser['id']) : [];
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -58,7 +59,7 @@ $pointsSummary = !empty($currentUser['id']) ? points_get_wallet_summary((int)$cu
                         <?php include 'includes/template_cards.php'; ?>
                     </div>
                 <?php elseif ($activeTab === 'assets'): ?>
-                    <div class="flex-1 overflow-auto">
+                    <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
                         <?php include 'includes/assets.php'; ?>
                     </div>
                 <?php elseif ($activeTab === 'profile'): ?>
