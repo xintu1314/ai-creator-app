@@ -87,7 +87,7 @@ $assetHistory = !empty($currentUser['id']) ? get_assets('all', 1, 50, (int)$curr
     <?php include 'includes/video_params_dialog.php'; ?>
     <?php include 'includes/template_sheet.php'; ?>
     
-    <script src="assets/js/main.js?v=20250226c"></script>
+    <script src="assets/js/main.js?v=20250226e"></script>
     <script>
         window.currentUser = <?= json_encode($currentUser, JSON_UNESCAPED_UNICODE) ?>;
         window.pointsSummary = <?= json_encode($pointsSummary, JSON_UNESCAPED_UNICODE) ?>;

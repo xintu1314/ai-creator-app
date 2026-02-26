@@ -1,7 +1,7 @@
 <?php
 /**
  * POST /api/auth/send_code.php
- * 发送手机号登录验证码
+ * 发送手机验证码（支持 purpose: login | register | reset_password）
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
@@ -16,11 +16,33 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $raw = file_get_contents('php://input');
 $input = json_decode($raw, true) ?? [];
 $phone = sms_normalize_phone((string)($input['phone'] ?? ''));
-$purpose = 'login';
+$purpose = in_array((string)($input['purpose'] ?? 'login'), ['login', 'register', 'reset_password'], true)
+    ? (string)$input['purpose']
+    : 'login';
 
 if (!sms_is_valid_phone($phone)) {
     json_error('请输入正确的11位手机号');
     exit;
+}
+
+if ($purpose === 'register') {
+    $pdo = get_db();
+    $check = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
+    $check->execute(['phone' => $phone]);
+    if ($check->fetch(PDO::FETCH_ASSOC)) {
+        json_error('该手机号已注册，请直接登录');
+        exit;
+    }
+}
+
+if ($purpose === 'reset_password' || $purpose === 'login') {
+    $pdo = get_db();
+    $check = $pdo->prepare("SELECT id FROM users WHERE phone = :phone LIMIT 1");
+    $check->execute(['phone' => $phone]);
+    if (!$check->fetch(PDO::FETCH_ASSOC)) {
+        json_error('该手机号未注册，请先注册');
+        exit;
+    }
 }
 
 $cfg = sms_config();
