@@ -96,18 +96,19 @@ POST /api/generation/create.php
 }
 ```
 
-### 10. 发送登录验证码（手机号）
+### 10. 发送验证码（手机号）
 
 ```
 POST /api/auth/send_code.php
 Content-Type: application/json
 
 {
-  "phone": "13800138000"
+  "phone": "13800138000",
+  "purpose": "login"   // 或 "register"，默认 login
 }
 ```
 
-### 11. 注册（手机号 + 密码）
+### 11. 注册（手机号 + 验证码 + 密码）
 
 ```
 POST /api/auth/register.php
@@ -115,6 +116,7 @@ Content-Type: application/json
 
 {
   "phone": "13800138000",
+  "code": "123456",
   "password": "12345678",
   "nickname": "可选昵称"
 }
@@ -126,13 +128,13 @@ Content-Type: application/json
 POST /api/auth/login.php
 Content-Type: application/json
 
+验证码登录（未注册自动创建）：
 {
   "phone": "13800138000",
   "code": "123456"
 }
 
-或
-
+密码登录（需已注册）：
 {
   "phone": "13800138000",
   "password": "12345678"

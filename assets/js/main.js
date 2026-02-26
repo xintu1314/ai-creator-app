@@ -14,7 +14,7 @@ function changeType(type) {
 // ============================
 // 账号认证：登录/注册/退出
 // ============================
-function openAuthDialog(mode = 'login') {
+function openAuthDialog(mode = 'code') {
     const dialog = document.getElementById('auth-dialog');
     if (!dialog) return;
     dialog.classList.remove('hidden');
@@ -31,25 +31,35 @@ function closeAuthDialog() {
 }
 
 function switchAuthTab(mode) {
-    const normalized = 'login';
+    const normalized = ['code', 'password', 'register'].includes(mode) ? mode : 'code';
     const modeInput = document.getElementById('auth-mode');
-    const loginTab = document.getElementById('auth-tab-login');
+    const codeTab = document.getElementById('auth-tab-code');
+    const passwordTab = document.getElementById('auth-tab-password');
     const registerTab = document.getElementById('auth-tab-register');
     const subtitle = document.getElementById('auth-subtitle');
     const submitBtn = document.getElementById('auth-submit-btn');
+    const codeWrap = document.getElementById('auth-code-wrap');
+    const passwordWrap = document.getElementById('auth-password-wrap');
+    const nicknameWrap = document.getElementById('auth-nickname-wrap');
+
     if (modeInput) modeInput.value = normalized;
 
     const selectedClass = 'bg-white text-[#2563EB] shadow-sm';
     const normalClass = 'text-[#64748B]';
-    if (loginTab) {
-        loginTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'login' ? selectedClass : normalClass);
-    }
-    if (registerTab) {
-        registerTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + normalClass;
-    }
+    if (codeTab) codeTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'code' ? selectedClass : normalClass);
+    if (passwordTab) passwordTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'password' ? selectedClass : normalClass);
+    if (registerTab) registerTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'register' ? selectedClass : normalClass);
 
-    if (subtitle) subtitle.textContent = '请输入手机号与短信验证码，未注册手机号将自动创建账号';
-    if (submitBtn) submitBtn.textContent = '登录 / 注册';
+    if (codeWrap) codeWrap.classList.toggle('hidden', normalized === 'password');
+    if (passwordWrap) passwordWrap.classList.toggle('hidden', normalized !== 'password' && normalized !== 'register');
+    if (nicknameWrap) nicknameWrap.classList.toggle('hidden', normalized !== 'register');
+
+    if (subtitle) {
+        if (normalized === 'code') subtitle.textContent = '请输入手机号与短信验证码，未注册将自动创建账号';
+        else if (normalized === 'password') subtitle.textContent = '请输入手机号与密码登录';
+        else subtitle.textContent = '请输入手机号、验证码和密码完成注册';
+    }
+    if (submitBtn) submitBtn.textContent = normalized === 'register' ? '注册' : '登录';
     setAuthError('');
 }
 
@@ -73,31 +83,58 @@ function normalizePhone(phone) {
 
 async function submitAuthForm(event) {
     event.preventDefault();
+    const mode = document.getElementById('auth-mode')?.value || 'code';
     const phone = normalizePhone((document.getElementById('auth-phone')?.value || '').trim());
     const code = (document.getElementById('auth-code')?.value || '').trim();
+    const password = (document.getElementById('auth-password')?.value || '').trim();
+    const nickname = (document.getElementById('auth-nickname')?.value || '').trim();
     const submitBtn = document.getElementById('auth-submit-btn');
 
     if (!/^1\d{10}$/.test(phone)) {
         setAuthError('请输入正确的11位手机号');
         return;
     }
-    if (!/^\d{6}$/.test(code)) {
-        setAuthError('请输入6位短信验证码');
-        return;
+
+    if (mode === 'code') {
+        if (!/^\d{6}$/.test(code)) {
+            setAuthError('请输入6位短信验证码');
+            return;
+        }
+    } else if (mode === 'password') {
+        if (password.length < 6 || password.length > 64) {
+            setAuthError('请输入6-64位密码');
+            return;
+        }
+    } else if (mode === 'register') {
+        if (!/^\d{6}$/.test(code)) {
+            setAuthError('请输入6位短信验证码');
+            return;
+        }
+        if (password.length < 6 || password.length > 64) {
+            setAuthError('密码长度需为6-64位');
+            return;
+        }
     }
 
     setAuthError('');
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
-        submitBtn.textContent = '登录中...';
+        submitBtn.textContent = mode === 'register' ? '注册中...' : '登录中...';
     }
 
     try {
-        const res = await fetch('api/auth/login.php', {
+        const url = mode === 'register' ? 'api/auth/register.php' : 'api/auth/login.php';
+        const body = mode === 'register'
+            ? { phone, code, password, nickname: nickname || undefined }
+            : mode === 'code'
+                ? { phone, code }
+                : { phone, password };
+
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, code }),
+            body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!data.success) {
@@ -111,7 +148,7 @@ async function submitAuthForm(event) {
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-            submitBtn.textContent = '登录 / 注册';
+            submitBtn.textContent = mode === 'register' ? '注册' : '登录';
         }
     }
 }
@@ -139,7 +176,9 @@ function startSendCodeCountdown(seconds) {
     }, 1000);
 }
 
-async function sendLoginCode() {
+async function sendAuthCode() {
+    const mode = document.getElementById('auth-mode')?.value || 'code';
+    const purpose = mode === 'register' ? 'register' : 'login';
     const phone = normalizePhone((document.getElementById('auth-phone')?.value || '').trim());
     if (!/^1\d{10}$/.test(phone)) {
         setAuthError('请输入正确的11位手机号');
@@ -151,7 +190,7 @@ async function sendLoginCode() {
         const res = await fetch('api/auth/send_code.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone }),
+            body: JSON.stringify({ phone, purpose }),
         });
         const data = await res.json();
         if (!data.success) {

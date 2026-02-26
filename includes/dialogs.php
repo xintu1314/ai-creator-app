@@ -221,7 +221,7 @@ window.currentSettings = {
 };
 </script>
 
-<!-- Auth Dialog：手机号验证码登录（登录注册一体） -->
+<!-- Auth Dialog：验证码登录 / 密码登录 / 注册 -->
 <div id="auth-dialog" class="hidden fixed inset-0 z-50 dialog-overlay" onclick="closeAuthDialog()" style="display: none;">
     <div class="dialog-content max-w-[420px] w-[92vw] p-0 gap-0 overflow-hidden rounded-2xl shadow-xl" onclick="event.stopPropagation()">
         <!-- 顶部促销区 -->
@@ -233,18 +233,18 @@ window.currentSettings = {
                 <span class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-[#0284C7] rounded-full shadow-sm">登录即送 AI 创作大礼包</span>
                 <span class="inline-flex items-center px-2.5 py-1 text-[10px] text-[#0369A1] border border-dashed border-[#0EA5E9]/60 rounded-full">对新用户</span>
             </div>
-            <h3 class="relative text-[22px] font-bold text-[#0C4A6E] mb-0.5">手机验证码登录</h3>
-            <p id="auth-subtitle" class="relative text-xs text-[#0369A1]/90">请输入手机号与短信验证码，未注册手机号将自动创建账号</p>
+            <h3 class="relative text-[22px] font-bold text-[#0C4A6E] mb-0.5">登录 / 注册</h3>
+            <p id="auth-subtitle" class="relative text-xs text-[#0369A1]/90">请选择登录方式或注册新账号</p>
         </div>
 
-        <!-- 保留结构兼容旧脚本，实际统一为验证码登录 -->
         <div class="flex mx-5 mt-4 mb-2 bg-[#F1F5F9] rounded-xl p-1">
-            <button type="button" id="auth-tab-login" onclick="switchAuthTab('login')" class="flex-1 h-9 text-sm font-medium rounded-lg transition-colors bg-white text-[#2563EB] shadow-sm">验证码登录</button>
-            <button type="button" id="auth-tab-register" onclick="switchAuthTab('register')" class="hidden flex-1 h-9 text-sm font-medium rounded-lg transition-colors text-[#64748B]">自动注册</button>
+            <button type="button" id="auth-tab-code" onclick="switchAuthTab('code')" class="flex-1 h-9 text-sm font-medium rounded-lg transition-colors bg-white text-[#2563EB] shadow-sm">验证码登录</button>
+            <button type="button" id="auth-tab-password" onclick="switchAuthTab('password')" class="flex-1 h-9 text-sm font-medium rounded-lg transition-colors text-[#64748B]">密码登录</button>
+            <button type="button" id="auth-tab-register" onclick="switchAuthTab('register')" class="flex-1 h-9 text-sm font-medium rounded-lg transition-colors text-[#64748B]">注册</button>
         </div>
 
         <form id="auth-form" class="p-5 space-y-4 bg-white" onsubmit="submitAuthForm(event)">
-            <input type="hidden" id="auth-mode" value="login">
+            <input type="hidden" id="auth-mode" value="code">
 
             <div>
                 <label class="text-sm text-[#64748B] mb-2 block font-medium">手机号</label>
@@ -256,23 +256,35 @@ window.currentSettings = {
                 </div>
             </div>
 
-            <div>
+            <div id="auth-code-wrap">
                 <label class="text-sm text-[#64748B] mb-2 block font-medium">短信验证码</label>
                 <div class="flex items-center gap-2">
                     <input id="auth-code" type="text" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="请输入6位验证码"
                         class="flex-1 h-12 px-4 text-sm rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all" />
-                    <button id="send-code-btn" type="button" onclick="sendLoginCode()"
+                    <button id="send-code-btn" type="button" onclick="sendAuthCode()"
                         class="h-12 px-4 text-sm font-medium text-[#1D4ED8] bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl hover:bg-[#DBEAFE] transition-colors whitespace-nowrap">
                         获取验证码
                     </button>
                 </div>
             </div>
 
+            <div id="auth-password-wrap" class="hidden">
+                <label class="text-sm text-[#64748B] mb-2 block font-medium">密码</label>
+                <input id="auth-password" type="password" autocomplete="current-password" placeholder="请输入密码（6-64位）"
+                    class="w-full h-12 px-4 text-sm rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all" />
+            </div>
+
+            <div id="auth-nickname-wrap" class="hidden">
+                <label class="text-sm text-[#64748B] mb-2 block font-medium">昵称（选填）</label>
+                <input id="auth-nickname" type="text" maxlength="100" autocomplete="nickname" placeholder="不填则使用手机号昵称"
+                    class="w-full h-12 px-4 text-sm rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 outline-none transition-all" />
+            </div>
+
             <div id="auth-error" class="hidden text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5"></div>
 
             <button id="auth-submit-btn" type="submit"
                 class="w-full h-12 text-base font-semibold bg-[#2563EB] hover:bg-[#1D4ED8] active:scale-[0.98] text-white rounded-xl transition-all shadow-lg shadow-blue-500/25">
-                登录 / 注册
+                登录
             </button>
 
             <p class="text-[11px] text-center text-[#94A3B8] leading-relaxed">
