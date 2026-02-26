@@ -109,11 +109,10 @@
                 </button>
             </div>
         <?php else: ?>
-            <button
-                type="button"
-                onclick="openAuthDialog('login')"
-                class="h-9 px-4 text-sm font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors"
-            >
+            <button type="button" onclick="openAuthDialog('register')" class="h-9 px-3 text-sm font-medium text-[#64748B] hover:text-[#2563EB] transition-colors cursor-pointer">
+                注册
+            </button>
+            <button type="button" onclick="openAuthDialog('login')" class="h-9 px-4 text-sm font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors cursor-pointer">
                 登录
             </button>
         <?php endif; ?>

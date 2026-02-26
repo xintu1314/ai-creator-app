@@ -12,14 +12,16 @@ function changeType(type) {
 }
 
 // ============================
-// 账号认证：登录/注册/退出
+// 账号认证：登录/注册/退出（登录与注册分开，登录分验证码/密码）
 // ============================
-function openAuthDialog(mode = 'code') {
+function openAuthDialog(mode) {
     const dialog = document.getElementById('auth-dialog');
     if (!dialog) return;
     dialog.classList.remove('hidden');
     dialog.style.display = 'flex';
-    switchAuthTab(mode);
+    if (mode === 'login') authShowLogin();
+    else if (mode === 'register') authShowRegister();
+    else authShowStep('choose');
 }
 
 function closeAuthDialog() {
@@ -27,44 +29,96 @@ function closeAuthDialog() {
     if (!dialog) return;
     dialog.classList.add('hidden');
     dialog.style.display = 'none';
-    setAuthError('');
+    authShowStep('choose');
+    setAuthLoginError('');
+    setAuthRegisterError('');
+    setAuthResetError('');
 }
 
-function switchAuthTab(mode) {
-    const normalized = ['code', 'password', 'register'].includes(mode) ? mode : 'code';
-    const modeInput = document.getElementById('auth-mode');
+function authShowStep(step) {
+    const choose = document.getElementById('auth-step-choose');
+    const login = document.getElementById('auth-step-login');
+    const register = document.getElementById('auth-step-register');
+    const reset = document.getElementById('auth-step-reset');
+    if (choose) choose.classList.toggle('hidden', step !== 'choose');
+    if (login) login.classList.toggle('hidden', step !== 'login');
+    if (register) register.classList.toggle('hidden', step !== 'register');
+    if (reset) reset.classList.toggle('hidden', step !== 'reset');
+}
+
+function authShowLogin() {
+    authShowStep('login');
+    switchLoginTab('code');
+}
+
+function authShowRegister() {
+    authShowStep('register');
+    setAuthRegisterError('');
+}
+
+function authShowReset() {
+    authShowStep('reset');
+    setAuthResetError('');
+    const loginPhone = document.getElementById('auth-login-phone')?.value || '';
+    const resetPhone = document.getElementById('auth-reset-phone');
+    if (resetPhone && loginPhone) resetPhone.value = loginPhone;
+}
+
+function authBackToChoose() {
+    authShowStep('choose');
+}
+
+function authBackToLogin() {
+    authShowStep('login');
+    switchLoginTab('password');
+}
+
+function switchLoginTab(mode) {
+    const normalized = mode === 'password' ? 'password' : 'code';
+    const modeInput = document.getElementById('auth-login-mode');
     const codeTab = document.getElementById('auth-tab-code');
     const passwordTab = document.getElementById('auth-tab-password');
-    const registerTab = document.getElementById('auth-tab-register');
-    const subtitle = document.getElementById('auth-subtitle');
-    const submitBtn = document.getElementById('auth-submit-btn');
-    const codeWrap = document.getElementById('auth-code-wrap');
-    const passwordWrap = document.getElementById('auth-password-wrap');
-    const nicknameWrap = document.getElementById('auth-nickname-wrap');
+    const codeWrap = document.getElementById('auth-login-code-wrap');
+    const passwordWrap = document.getElementById('auth-login-password-wrap');
+    const subtitle = document.getElementById('auth-login-subtitle');
 
     if (modeInput) modeInput.value = normalized;
-
     const selectedClass = 'bg-white text-[#2563EB] shadow-sm';
     const normalClass = 'text-[#64748B]';
-    if (codeTab) codeTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'code' ? selectedClass : normalClass);
-    if (passwordTab) passwordTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'password' ? selectedClass : normalClass);
-    if (registerTab) registerTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors ' + (normalized === 'register' ? selectedClass : normalClass);
-
+    if (codeTab) codeTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors cursor-pointer ' + (normalized === 'code' ? selectedClass : normalClass);
+    if (passwordTab) passwordTab.className = 'flex-1 h-9 text-sm font-medium rounded-lg transition-colors cursor-pointer ' + (normalized === 'password' ? selectedClass : normalClass);
     if (codeWrap) codeWrap.classList.toggle('hidden', normalized === 'password');
-    if (passwordWrap) passwordWrap.classList.toggle('hidden', normalized !== 'password' && normalized !== 'register');
-    if (nicknameWrap) nicknameWrap.classList.toggle('hidden', normalized !== 'register');
-
-    if (subtitle) {
-        if (normalized === 'code') subtitle.textContent = '请输入手机号与短信验证码，未注册将自动创建账号';
-        else if (normalized === 'password') subtitle.textContent = '请输入手机号与密码登录';
-        else subtitle.textContent = '请输入手机号、验证码和密码完成注册';
-    }
-    if (submitBtn) submitBtn.textContent = normalized === 'register' ? '注册' : '登录';
-    setAuthError('');
+    if (passwordWrap) passwordWrap.classList.toggle('hidden', normalized !== 'password');
+    if (subtitle) subtitle.textContent = normalized === 'code' ? '验证码登录（需已注册）' : '密码登录（需已注册）';
+    setAuthLoginError('');
 }
 
-function setAuthError(msg) {
-    const errEl = document.getElementById('auth-error');
+function setAuthLoginError(msg) {
+    const errEl = document.getElementById('auth-login-error');
+    if (!errEl) return;
+    if (msg) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+    } else {
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+    }
+}
+
+function setAuthRegisterError(msg) {
+    const errEl = document.getElementById('auth-register-error');
+    if (!errEl) return;
+    if (msg) {
+        errEl.textContent = msg;
+        errEl.classList.remove('hidden');
+    } else {
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+    }
+}
+
+function setAuthResetError(msg) {
+    const errEl = document.getElementById('auth-reset-error');
     if (!errEl) return;
     if (msg) {
         errEl.textContent = msg;
@@ -81,130 +135,278 @@ function normalizePhone(phone) {
     return digits;
 }
 
-async function submitAuthForm(event) {
+async function submitLoginForm(event) {
     event.preventDefault();
-    const mode = document.getElementById('auth-mode')?.value || 'code';
-    const phone = normalizePhone((document.getElementById('auth-phone')?.value || '').trim());
-    const code = (document.getElementById('auth-code')?.value || '').trim();
-    const password = (document.getElementById('auth-password')?.value || '').trim();
-    const nickname = (document.getElementById('auth-nickname')?.value || '').trim();
-    const submitBtn = document.getElementById('auth-submit-btn');
+    const mode = document.getElementById('auth-login-mode')?.value || 'code';
+    const phone = normalizePhone((document.getElementById('auth-login-phone')?.value || '').trim());
+    const code = (document.getElementById('auth-login-code')?.value || '').trim();
+    const password = (document.getElementById('auth-login-password')?.value || '').trim();
+    const submitBtn = document.getElementById('auth-login-submit');
 
     if (!/^1\d{10}$/.test(phone)) {
-        setAuthError('请输入正确的11位手机号');
+        setAuthLoginError('请输入正确的11位手机号');
         return;
     }
-
     if (mode === 'code') {
         if (!/^\d{6}$/.test(code)) {
-            setAuthError('请输入6位短信验证码');
+            setAuthLoginError('请输入6位短信验证码');
             return;
         }
-    } else if (mode === 'password') {
+    } else {
         if (password.length < 6 || password.length > 64) {
-            setAuthError('请输入6-64位密码');
-            return;
-        }
-    } else if (mode === 'register') {
-        if (!/^\d{6}$/.test(code)) {
-            setAuthError('请输入6位短信验证码');
-            return;
-        }
-        if (password.length < 6 || password.length > 64) {
-            setAuthError('密码长度需为6-64位');
+            setAuthLoginError('请输入6-64位密码');
             return;
         }
     }
 
-    setAuthError('');
+    setAuthLoginError('');
     if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
-        submitBtn.textContent = mode === 'register' ? '注册中...' : '登录中...';
+        submitBtn.textContent = '登录中...';
     }
 
     try {
-        const url = mode === 'register' ? 'api/auth/register.php' : 'api/auth/login.php';
-        const body = mode === 'register'
-            ? { phone, code, password, nickname: nickname || undefined }
-            : mode === 'code'
-                ? { phone, code }
-                : { phone, password };
-
-        const res = await fetch(url, {
+        const body = mode === 'code' ? { phone, code } : { phone, password };
+        const res = await fetch('api/auth/login.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!data.success) {
-            setAuthError(data.message || '操作失败，请稍后重试');
+            setAuthLoginError(data.message || '操作失败，请稍后重试');
             return;
         }
         window.location.reload();
     } catch (err) {
-        setAuthError('网络异常，请稍后重试');
+        setAuthLoginError('网络异常，请稍后重试');
     } finally {
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-            submitBtn.textContent = mode === 'register' ? '注册' : '登录';
+            submitBtn.textContent = '登录';
         }
     }
 }
 
-function setSendCodeBtnText(text, disabled = false) {
-    const btn = document.getElementById('send-code-btn');
+async function submitRegisterForm(event) {
+    event.preventDefault();
+    const phone = normalizePhone((document.getElementById('auth-register-phone')?.value || '').trim());
+    const code = (document.getElementById('auth-register-code')?.value || '').trim();
+    const password = (document.getElementById('auth-register-password')?.value || '').trim();
+    const nickname = (document.getElementById('auth-register-nickname')?.value || '').trim();
+    const submitBtn = document.getElementById('auth-register-submit');
+
+    if (!/^1\d{10}$/.test(phone)) {
+        setAuthRegisterError('请输入正确的11位手机号');
+        return;
+    }
+    if (!/^\d{6}$/.test(code)) {
+        setAuthRegisterError('请输入6位短信验证码');
+        return;
+    }
+    if (password.length < 6 || password.length > 64) {
+        setAuthRegisterError('密码长度需为6-64位');
+        return;
+    }
+
+    setAuthRegisterError('');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '注册中...';
+    }
+
+    try {
+        const res = await fetch('api/auth/register.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, code, password, nickname: nickname || undefined }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            setAuthRegisterError(data.message || '操作失败，请稍后重试');
+            return;
+        }
+        window.location.reload();
+    } catch (err) {
+        setAuthRegisterError('网络异常，请稍后重试');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '注册';
+        }
+    }
+}
+
+function setSendCodeBtnText(btnId, text, disabled) {
+    const btn = document.getElementById(btnId);
     if (!btn) return;
     btn.textContent = text;
     btn.disabled = disabled;
-    if (disabled) btn.classList.add('opacity-70', 'cursor-not-allowed');
-    else btn.classList.remove('opacity-70', 'cursor-not-allowed');
 }
 
-function startSendCodeCountdown(seconds) {
+function startSendCodeCountdown(btnId, seconds) {
     let left = Math.max(1, Number(seconds || 60));
-    setSendCodeBtnText(`${left}s后重发`, true);
+    setSendCodeBtnText(btnId, `${left}s后重发`, true);
     const timer = setInterval(() => {
         left -= 1;
         if (left <= 0) {
             clearInterval(timer);
-            setSendCodeBtnText('获取验证码', false);
+            setSendCodeBtnText(btnId, '获取验证码', false);
             return;
         }
-        setSendCodeBtnText(`${left}s后重发`, true);
+        setSendCodeBtnText(btnId, `${left}s后重发`, true);
     }, 1000);
 }
 
-async function sendAuthCode() {
-    const mode = document.getElementById('auth-mode')?.value || 'code';
-    const purpose = mode === 'register' ? 'register' : 'login';
-    const phone = normalizePhone((document.getElementById('auth-phone')?.value || '').trim());
+async function sendLoginCode() {
+    const phone = normalizePhone((document.getElementById('auth-login-phone')?.value || '').trim());
     if (!/^1\d{10}$/.test(phone)) {
-        setAuthError('请输入正确的11位手机号');
+        setAuthLoginError('请输入正确的11位手机号');
         return;
     }
-    setAuthError('');
-    setSendCodeBtnText('发送中...', true);
+    setAuthLoginError('');
+    setSendCodeBtnText('auth-send-code-btn', '发送中...', true);
     try {
         const res = await fetch('api/auth/send_code.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, purpose }),
+            body: JSON.stringify({ phone, purpose: 'login' }),
         });
         const data = await res.json();
         if (!data.success) {
-            setAuthError(data.message || '验证码发送失败');
-            setSendCodeBtnText('获取验证码', false);
+            setAuthLoginError(data.message || '验证码发送失败');
+            setSendCodeBtnText('auth-send-code-btn', '获取验证码', false);
             return;
         }
         if (data.data?.debugCode) {
-            setAuthError(`调试验证码：${data.data.debugCode}`);
+            setAuthLoginError(`调试验证码：${data.data.debugCode}`);
         }
-        startSendCodeCountdown(data.data?.resendIn || 60);
+        startSendCodeCountdown('auth-send-code-btn', data.data?.resendIn || 60);
     } catch (err) {
-        setAuthError('网络异常，验证码发送失败');
-        setSendCodeBtnText('获取验证码', false);
+        setAuthLoginError('网络异常，验证码发送失败');
+        setSendCodeBtnText('auth-send-code-btn', '获取验证码', false);
+    }
+}
+
+async function sendRegisterCode() {
+    const phone = normalizePhone((document.getElementById('auth-register-phone')?.value || '').trim());
+    if (!/^1\d{10}$/.test(phone)) {
+        setAuthRegisterError('请输入正确的11位手机号');
+        return;
+    }
+    setAuthRegisterError('');
+    setSendCodeBtnText('auth-register-send-btn', '发送中...', true);
+    try {
+        const res = await fetch('api/auth/send_code.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, purpose: 'register' }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            setAuthRegisterError(data.message || '验证码发送失败');
+            setSendCodeBtnText('auth-register-send-btn', '获取验证码', false);
+            return;
+        }
+        if (data.data?.debugCode) {
+            setAuthRegisterError(`调试验证码：${data.data.debugCode}`);
+        }
+        startSendCodeCountdown('auth-register-send-btn', data.data?.resendIn || 60);
+    } catch (err) {
+        setAuthRegisterError('网络异常，验证码发送失败');
+        setSendCodeBtnText('auth-register-send-btn', '获取验证码', false);
+    }
+}
+
+async function submitResetForm(event) {
+    event.preventDefault();
+    const phone = normalizePhone((document.getElementById('auth-reset-phone')?.value || '').trim());
+    const code = (document.getElementById('auth-reset-code')?.value || '').trim();
+    const password = (document.getElementById('auth-reset-password')?.value || '').trim();
+    const submitBtn = document.getElementById('auth-reset-submit');
+
+    if (!/^1\d{10}$/.test(phone)) {
+        setAuthResetError('请输入正确的11位手机号');
+        return;
+    }
+    if (!/^\d{6}$/.test(code)) {
+        setAuthResetError('请输入6位短信验证码');
+        return;
+    }
+    if (password.length < 6 || password.length > 64) {
+        setAuthResetError('新密码长度需为6-64位');
+        return;
+    }
+
+    setAuthResetError('');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '重置中...';
+    }
+
+    try {
+        const res = await fetch('api/auth/reset_password.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, code, password }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            setAuthResetError(data.message || '操作失败，请稍后重试');
+            return;
+        }
+        const errEl = document.getElementById('auth-reset-error');
+        if (errEl) {
+            errEl.textContent = '密码重置成功！请使用新密码登录';
+            errEl.classList.remove('hidden');
+            errEl.classList.add('!text-green-600', '!bg-green-50', '!border-green-100');
+            errEl.classList.remove('text-red-600', 'bg-red-50', 'border-red-100');
+        }
+        setTimeout(() => {
+            authBackToLogin();
+            setAuthResetError('');
+            if (errEl) {
+                errEl.classList.remove('!text-green-600', '!bg-green-50', '!border-green-100');
+                errEl.classList.add('text-red-600', 'bg-red-50', 'border-red-100');
+            }
+        }, 2000);
+    } catch (err) {
+        setAuthResetError('网络异常，请稍后重试');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '重置密码';
+        }
+    }
+}
+
+async function sendResetCode() {
+    const phone = normalizePhone((document.getElementById('auth-reset-phone')?.value || '').trim());
+    if (!/^1\d{10}$/.test(phone)) {
+        setAuthResetError('请输入正确的11位手机号');
+        return;
+    }
+    setAuthResetError('');
+    setSendCodeBtnText('auth-reset-send-btn', '发送中...', true);
+    try {
+        const res = await fetch('api/auth/send_code.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, purpose: 'reset_password' }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            setAuthResetError(data.message || '验证码发送失败');
+            setSendCodeBtnText('auth-reset-send-btn', '获取验证码', false);
+            return;
+        }
+        if (data.data?.debugCode) {
+            setAuthResetError(`调试验证码：${data.data.debugCode}`);
+        }
+        startSendCodeCountdown('auth-reset-send-btn', data.data?.resendIn || 60);
+    } catch (err) {
+        setAuthResetError('网络异常，验证码发送失败');
+        setSendCodeBtnText('auth-reset-send-btn', '获取验证码', false);
     }
 }
 

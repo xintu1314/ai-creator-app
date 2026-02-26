@@ -24,7 +24,7 @@ if (!empty($currentUser) && auth_is_admin()) {
             <?php $isActive = $activeTab === $item['id']; ?>
             <button
                 onclick="changeTab('<?= $item['id'] ?>')"
-                class="w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-[#F5F5F5] <?= $isActive ? 'bg-[#EEF2FF]' : '' ?>"
+                class="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-[#F5F5F5] <?= $isActive ? 'bg-[#EEF2FF]' : '' ?>"
                 title="<?= htmlspecialchars($item['label']) ?>"
             >
                 <i data-lucide="<?= $item['icon'] ?>" class="w-5 h-5 transition-colors duration-200 <?= $isActive ? 'text-[#3B82F6]' : 'text-[#666666]' ?>"></i>
@@ -34,7 +34,7 @@ if (!empty($currentUser) && auth_is_admin()) {
 
     <!-- Settings -->
     <button 
-        class="w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-[#F5F5F5]"
+        class="min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg flex items-center justify-center transition-all duration-200 hover:bg-[#F5F5F5]"
         title="设置"
     >
         <i data-lucide="settings" class="w-5 h-5 text-[#666666]"></i>

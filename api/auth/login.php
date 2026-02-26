@@ -1,9 +1,9 @@
 <?php
 /**
  * POST /api/auth/login.php
- * 支持两种登录方式：
- * 1. 手机号 + 验证码登录（未注册自动创建账号）
- * 2. 手机号 + 密码登录（需已注册）
+ * 支持两种登录方式（均需已注册）：
+ * 1. 手机号 + 验证码登录
+ * 2. 手机号 + 密码登录
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
@@ -118,36 +118,9 @@ try {
         $useStmt->execute(['id' => (int)$codeRow['id']]);
 
         if (!$user) {
-            $masked = substr($phone, 0, 3) . '****' . substr($phone, -4);
-            $account = 'u' . $phone;
-            $dummyPwd = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
-            try {
-                $createStmt = $pdo->prepare("
-                    INSERT INTO users (account, phone, password_hash, nickname)
-                    VALUES (:account, :phone, :password_hash, :nickname)
-                    RETURNING id, account, phone, nickname, password_hash, role, status
-                ");
-                $createStmt->execute([
-                    'account' => $account,
-                    'phone' => $phone,
-                    'password_hash' => $dummyPwd,
-                    'nickname' => '用户' . $masked,
-                ]);
-                $user = $createStmt->fetch(PDO::FETCH_ASSOC);
-            } catch (Throwable $e) {
-                $refetch = $pdo->prepare("
-                    SELECT id, account, phone, nickname, password_hash, role, status
-                    FROM users
-                    WHERE phone = :phone
-                    LIMIT 1
-                    FOR UPDATE
-                ");
-                $refetch->execute(['phone' => $phone]);
-                $user = $refetch->fetch(PDO::FETCH_ASSOC);
-                if (!$user) {
-                    throw $e;
-                }
-            }
+            $pdo->rollBack();
+            json_error('该手机号未注册，请先注册', 401);
+            exit;
         }
     } else {
         // 密码登录

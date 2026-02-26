@@ -86,7 +86,7 @@ $pointsSummary = !empty($currentUser['id']) ? points_get_wallet_summary((int)$cu
     <?php include 'includes/video_params_dialog.php'; ?>
     <?php include 'includes/template_sheet.php'; ?>
     
-    <script src="assets/js/main.js?v=20250215"></script>
+    <script src="assets/js/main.js?v=20250226b"></script>
     <script>
         window.currentUser = <?= json_encode($currentUser, JSON_UNESCAPED_UNICODE) ?>;
         window.pointsSummary = <?= json_encode($pointsSummary, JSON_UNESCAPED_UNICODE) ?>;

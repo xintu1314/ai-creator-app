@@ -24,18 +24,18 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
         <div id="creation-card" class="max-w-[900px] mx-auto bg-white rounded-2xl shadow-md p-6">
             <!-- Tabs -->
             <div class="flex gap-6 mb-5 border-b border-[#E5E5E5]">
-                <button onclick="changeType('image')" class="flex items-center gap-2 pb-3 text-sm font-medium transition-all duration-200 relative <?= $creationType === 'image' ? 'text-[#3B82F6]' : 'text-[#666666] hover:text-[#1A1A1A]' ?>">
+                <button onclick="changeType('image')" class="flex items-center gap-2 pb-3 pt-1 min-h-[44px] text-sm font-medium transition-all duration-200 relative <?= $creationType === 'image' ? 'text-[#3B82F6]' : 'text-[#666666] hover:text-[#1A1A1A]' ?>">
                     <i data-lucide="image" class="w-4 h-4"></i>
                     图片生成
                     <?php if ($creationType === 'image'): ?>
-                        <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B82F6] rounded-full"></span>
+                        <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B82F6] rounded-full pointer-events-none"></span>
                     <?php endif; ?>
                 </button>
-                <button onclick="changeType('video')" class="flex items-center gap-2 pb-3 text-sm font-medium transition-all duration-200 relative <?= $creationType === 'video' ? 'text-[#3B82F6]' : 'text-[#666666] hover:text-[#1A1A1A]' ?>">
+                <button onclick="changeType('video')" class="flex items-center gap-2 pb-3 pt-1 min-h-[44px] text-sm font-medium transition-all duration-200 relative <?= $creationType === 'video' ? 'text-[#3B82F6]' : 'text-[#666666] hover:text-[#1A1A1A]' ?>">
                     <i data-lucide="video" class="w-4 h-4"></i>
                     视频生成
                     <?php if ($creationType === 'video'): ?>
-                        <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B82F6] rounded-full"></span>
+                        <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B82F6] rounded-full pointer-events-none"></span>
                     <?php endif; ?>
                 </button>
             </div>
@@ -124,7 +124,7 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
                     <!-- Model Selector -->
                     <button
                         onclick="openModelDialog()"
-                        class="flex items-center gap-2 px-3 py-1.5 text-sm text-[#1A1A1A] bg-[#F5F5F5] rounded-lg hover:bg-[#E5E5E5] transition-colors"
+                        class="flex items-center gap-2 px-3 py-2 min-h-[44px] text-sm text-[#1A1A1A] bg-[#F5F5F5] rounded-lg hover:bg-[#E5E5E5] transition-colors"
                     >
                         <div class="w-4 h-4 rounded bg-gradient-to-br from-blue-400 to-blue-600"></div>
                         <span id="selected-model"><?= htmlspecialchars($currentModel['name']) ?></span>
@@ -135,7 +135,7 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
                     <?php if ($creationType === 'image'): ?>
                         <button
                             onclick="openParamsDialog()"
-                            class="flex items-center gap-2 px-3 py-1.5 text-sm text-[#1A1A1A] bg-[#F5F5F5] rounded-lg hover:bg-[#E5E5E5] transition-colors"
+                            class="flex items-center gap-2 px-3 py-2 min-h-[44px] text-sm text-[#1A1A1A] bg-[#F5F5F5] rounded-lg hover:bg-[#E5E5E5] transition-colors"
                         >
                             <span id="aspect-ratio"><?= $defaultAspectRatio ?></span>
                             <span class="text-[#999999]">·</span>
@@ -145,7 +145,7 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
                     <?php else: ?>
                         <button
                             onclick="openVideoParamsDialog()"
-                            class="flex items-center gap-2 px-3 py-1.5 text-sm text-[#1A1A1A] bg-[#F5F5F5] rounded-lg hover:bg-[#E5E5E5] transition-colors"
+                            class="flex items-center gap-2 px-3 py-2 min-h-[44px] text-sm text-[#1A1A1A] bg-[#F5F5F5] rounded-lg hover:bg-[#E5E5E5] transition-colors"
                         >
                             <span id="video-aspect-ratio"><?= $defaultAspectRatio ?></span>
                             <span class="text-[#999999]">·</span>

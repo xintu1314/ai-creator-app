@@ -104,7 +104,7 @@ Content-Type: application/json
 
 {
   "phone": "13800138000",
-  "purpose": "login"   // 或 "register"，默认 login
+  "purpose": "login"   // login | register | reset_password，默认 login
 }
 ```
 
@@ -122,13 +122,26 @@ Content-Type: application/json
 }
 ```
 
-### 12. 登录（手机号 + 验证码 或 手机号 + 密码）
+### 12. 忘记密码 / 重置密码
+
+```
+POST /api/auth/reset_password.php
+Content-Type: application/json
+
+{
+  "phone": "13800138000",
+  "code": "123456",
+  "password": "新密码6-64位"
+}
+```
+
+### 13. 登录（手机号 + 验证码 或 手机号 + 密码）
 
 ```
 POST /api/auth/login.php
 Content-Type: application/json
 
-验证码登录（未注册自动创建）：
+验证码登录（需已注册）：
 {
   "phone": "13800138000",
   "code": "123456"
@@ -141,13 +154,13 @@ Content-Type: application/json
 }
 ```
 
-### 13. 当前登录态
+### 14. 当前登录态
 
 ```
 GET /api/auth/me.php
 ```
 
-### 14. 退出登录
+### 15. 退出登录
 
 ```
 POST /api/auth/logout.php

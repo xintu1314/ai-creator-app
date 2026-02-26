@@ -82,7 +82,7 @@ $filteredHistory = $historyItems; // get_assets 已按 filter 过滤
                                 <?= $item['type'] === 'image' ? '图片' : '视频' ?>
                             </span>
                         </div>
-                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
                             <button type="button" data-asset-url="<?= $mediaUrl ?>" data-asset-video="<?= $isVideo ? '1' : '0' ?>" class="h-9 px-3 rounded-lg bg-white/90 hover:bg-white text-sm font-medium text-[#1A1A1A] flex items-center gap-1.5" onclick="event.stopPropagation();openAssetPreview(this.getAttribute('data-asset-url'),this.getAttribute('data-asset-video')==='1')">
                                 <i data-lucide="eye" class="w-4 h-4"></i>查看
                             </button>

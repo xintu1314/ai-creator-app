@@ -122,8 +122,8 @@ $filteredTemplates = $selectedCategory === '全部'
                             </p>
                         </div>
 
-                        <!-- Hover Overlay -->
-                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex items-center justify-center">
+                        <!-- Hover Overlay - pointer-events-none 未悬停时让点击穿透到父级 -->
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex items-center justify-center pointer-events-none group-hover:pointer-events-auto">
                             <button class="px-4 py-1.5 text-xs font-medium text-white bg-white/20 backdrop-blur-sm rounded-lg hover:bg-white/30 transition-colors">
                                 做同款
                             </button>

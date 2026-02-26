@@ -8,8 +8,8 @@
     display: none;
 }
 
-/* Smooth transitions */
-* {
+/* Smooth transitions - 仅作用于有 transition 的元素，避免影响点击区域 */
+button, a, [role="button"], .transition-all, .transition-colors, .transition-opacity {
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -75,6 +75,13 @@ button:focus {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
+/* 按钮内图标不拦截点击，确保整块按钮可点 */
+button [data-lucide],
+button svg,
+button i {
+    pointer-events: none;
+}
+
 /* Custom button press effect */
 button:active {
     transform: scale(0.98);
@@ -138,6 +145,7 @@ button:active {
     content: '';
     position: absolute;
     inset: 0;
+    pointer-events: none;
     background: linear-gradient(
         180deg,
         rgba(255, 255, 255, 0) 0%,

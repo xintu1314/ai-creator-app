@@ -21,8 +21,8 @@
             $looksLikeVideo = $mediaUrl !== '' && preg_match('/\.(mp4|webm|mov|m3u8)(\?|$)/i', $mediaUrl);
             $renderAsVideo = $isVideoType && $looksLikeVideo;
             ?>
-            <div class="flex-shrink-0 w-[160px] group template-card" data-template-id="<?= $template['id'] ?>">
-                <div class="relative w-full h-[200px] rounded-xl overflow-hidden cursor-pointer transition-all duration-300 shadow-md group-hover:shadow-lg group-hover:-translate-y-1">
+            <div class="flex-shrink-0 w-[160px] group template-card cursor-pointer" data-template-id="<?= $template['id'] ?>" onclick="useTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>)">
+                <div class="relative w-full h-[200px] rounded-xl overflow-hidden transition-all duration-300 shadow-md group-hover:shadow-lg group-hover:-translate-y-1">
                     <?php if ($renderAsVideo): ?>
                         <video
                             src="<?= htmlspecialchars($mediaUrl) ?>"
@@ -51,10 +51,10 @@
                         <p class="text-xs text-white line-clamp-2"><?= htmlspecialchars($template['title']) ?></p>
                     </div>
 
-                    <!-- Hover Overlay with Action Button -->
-                    <div class="absolute inset-0 bg-black/40 flex items-end justify-center p-3 opacity-0 group-hover:opacity-100 transition-all duration-250">
+                    <!-- Hover Overlay with Action Button - pointer-events-none 未悬停时让点击穿透 -->
+                    <div class="absolute inset-0 bg-black/40 flex items-end justify-center p-3 opacity-0 group-hover:opacity-100 transition-all duration-250 pointer-events-none group-hover:pointer-events-auto">
                         <button
-                            onclick="useTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>)"
+                            onclick="event.stopPropagation(); useTemplate(<?= htmlspecialchars(json_encode($template, JSON_UNESCAPED_UNICODE)) ?>)"
                             class="w-full py-2 text-sm font-medium text-[#1A1A1A] bg-white rounded-lg transform translate-y-full group-hover:translate-y-0 transition-all duration-250"
                         >
                             做同款
