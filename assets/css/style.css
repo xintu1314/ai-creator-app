@@ -65,6 +65,17 @@ button:focus {
     }
 }
 
+/* 参考图 / 首帧 / 尾帧：减轻移动端约 300ms 点击延迟、去掉系统高亮 */
+.upload-drop-zone {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.upload-drop-zone:focus-within {
+    border-color: #3b82f6;
+    background-color: #f0f7ff;
+}
+
 /* Hover lift effect */
 .hover-lift {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -200,14 +211,6 @@ button:active {
 
 .creating-mode #template-cards-section {
     display: none;
-}
-
-/* 生成中 loading 旋转动效（确保始终可见） */
-@keyframes gen-spin {
-  to { transform: rotate(360deg); }
-}
-.gen-loading-spinner {
-  animation: gen-spin 1s linear infinite;
 }
 
 /* 生成进度条动画 */

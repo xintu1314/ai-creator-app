@@ -25,12 +25,14 @@ $currentModel = $currentModel ?? ($models[0] ?? null);
     <div id="input-section-image" class="mb-4 <?= $creationType === 'video' ? 'hidden' : '' ?>">
         <div class="flex flex-col sm:flex-row sm:flex-nowrap items-stretch gap-3 min-w-0">
             <div class="flex gap-2 items-start flex-shrink-0 justify-center sm:justify-start">
-                <div id="ref-images-upload" class="w-[80px] h-[80px] sm:w-[84px] sm:h-[84px] min-w-[80px] min-h-[80px] sm:min-w-[84px] sm:min-h-[84px] max-w-[80px] max-h-[80px] sm:max-w-[84px] sm:max-h-[84px] overflow-hidden border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all duration-200 flex-shrink-0" onclick="document.getElementById('ref-images-input').click()">
-                    <input type="file" id="ref-images-input" accept="image/*" multiple class="hidden" onchange="handleRefImagesUpload(this)">
-                    <i data-lucide="plus" class="w-5 h-5 text-[#999999] mb-0.5 flex-shrink-0"></i>
-                    <span class="text-[10px] text-[#999999] leading-tight text-center">添加</span>
-                    <span class="text-[9px] text-[#BBBBBB] leading-tight text-center mt-0.5">点击或拖拽</span>
-                </div>
+                <label id="ref-images-upload" for="ref-images-input" class="upload-drop-zone group relative flex flex-col items-center justify-center flex-shrink-0 overflow-hidden cursor-pointer select-none rounded-lg border-2 border-dashed border-[#E5E5E5] bg-[#FAFAFA] w-[80px] h-[80px] sm:w-[84px] sm:h-[84px] min-w-[80px] min-h-[80px] sm:min-w-[84px] sm:min-h-[84px] max-w-[80px] max-h-[80px] sm:max-w-[84px] sm:max-h-[84px] shadow-sm transition-all duration-200 hover:border-[#3B82F6] hover:bg-[#F0F7FF]">
+                    <span class="pointer-events-none absolute inset-0 z-0 flex flex-col items-center justify-center gap-0.5 px-1.5">
+                        <i data-lucide="image-plus" class="w-5 h-5 text-[#999999] mb-0.5 flex-shrink-0"></i>
+                        <span class="text-[10px] text-[#999999] leading-tight text-center">参考图</span>
+                        <span class="text-[9px] text-[#BBBBBB] leading-tight text-center mt-0.5">点击或拖拽</span>
+                    </span>
+                    <input type="file" id="ref-images-input" accept="image/*" multiple class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" onchange="handleRefImagesUpload(this)" aria-label="添加参考图">
+                </label>
                 <div id="ref-images-preview" class="flex flex-wrap gap-2 max-w-[240px] max-h-[84px] overflow-y-auto content-start"></div>
             </div>
             <div class="flex-1 min-w-0 min-h-[80px] sm:min-h-[84px]">
@@ -43,21 +45,21 @@ $currentModel = $currentModel ?? ($models[0] ?? null);
     <div id="input-section-video" class="mb-4 <?= $creationType === 'image' ? 'hidden' : '' ?>">
         <div class="flex flex-col sm:flex-row sm:flex-nowrap items-stretch gap-3 min-w-0">
             <div class="flex gap-3 flex-shrink-0 justify-center sm:justify-start">
-                <div id="first-frame-drop" class="w-[80px] h-[80px] sm:w-[84px] sm:h-[84px] overflow-hidden border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all duration-200 relative flex-shrink-0">
-                    <input type="file" accept="image/*" id="first-frame-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFrameUpload(this, 'first-frame-preview', 'first-frame')" />
-                    <div id="first-frame-preview" class="w-full h-full flex flex-col items-center justify-center min-w-0 min-h-0 p-1">
-                        <i data-lucide="plus" class="w-5 h-5 text-[#999999] mb-0.5 flex-shrink-0"></i>
+                <div id="first-frame-drop" class="upload-drop-zone relative flex flex-shrink-0 cursor-pointer select-none overflow-hidden rounded-lg border-2 border-dashed border-[#E5E5E5] bg-[#FAFAFA] w-[80px] h-[80px] sm:w-[84px] sm:h-[84px] min-w-[80px] min-h-[80px] sm:min-w-[84px] sm:min-h-[84px] max-w-[80px] max-h-[80px] sm:max-w-[84px] sm:max-h-[84px] shadow-sm transition-all duration-200 hover:border-[#3B82F6] hover:bg-[#F0F7FF]">
+                    <div id="first-frame-preview" class="relative z-0 flex h-full w-full min-h-0 min-w-0 flex-col items-center justify-center p-1">
+                        <i data-lucide="clapperboard" class="w-5 h-5 text-[#999999] mb-0.5 flex-shrink-0"></i>
                         <span class="text-[10px] text-[#999999] leading-tight text-center">首帧</span>
-                        <span class="text-[9px] text-[#BBBBBB] leading-tight text-center mt-0.5">点击或拖拽上传</span>
+                        <span class="text-[9px] text-[#BBBBBB] leading-tight text-center mt-0.5">点击或拖拽</span>
                     </div>
+                    <input type="file" accept="image/*" id="first-frame-input" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" onchange="handleFrameUpload(this, 'first-frame-preview', 'first-frame')" aria-label="上传首帧图片">
                 </div>
-                <div id="last-frame-drop" class="w-[80px] h-[80px] sm:w-[84px] sm:h-[84px] overflow-hidden border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all duration-200 relative flex-shrink-0">
-                    <input type="file" accept="image/*" id="last-frame-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFrameUpload(this, 'last-frame-preview', 'last-frame')" />
-                    <div id="last-frame-preview" class="w-full h-full flex flex-col items-center justify-center min-w-0 min-h-0 p-1">
-                        <i data-lucide="plus" class="w-5 h-5 text-[#999999] mb-0.5 flex-shrink-0"></i>
+                <div id="last-frame-drop" class="upload-drop-zone relative flex flex-shrink-0 cursor-pointer select-none overflow-hidden rounded-lg border-2 border-dashed border-[#E5E5E5] bg-[#FAFAFA] w-[80px] h-[80px] sm:w-[84px] sm:h-[84px] min-w-[80px] min-h-[80px] sm:min-w-[84px] sm:min-h-[84px] max-w-[80px] max-h-[80px] sm:max-w-[84px] sm:max-h-[84px] shadow-sm transition-all duration-200 hover:border-[#3B82F6] hover:bg-[#F0F7FF]">
+                    <div id="last-frame-preview" class="relative z-0 flex h-full w-full min-h-0 min-w-0 flex-col items-center justify-center p-1">
+                        <i data-lucide="flag" class="w-5 h-5 text-[#999999] mb-0.5 flex-shrink-0"></i>
                         <span class="text-[10px] text-[#999999] leading-tight text-center">尾帧</span>
-                        <span class="text-[9px] text-[#BBBBBB] leading-tight text-center mt-0.5">点击或拖拽上传</span>
+                        <span class="text-[9px] text-[#BBBBBB] leading-tight text-center mt-0.5">点击或拖拽</span>
                     </div>
+                    <input type="file" accept="image/*" id="last-frame-input" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" onchange="handleFrameUpload(this, 'last-frame-preview', 'last-frame')" aria-label="上传尾帧图片">
                 </div>
             </div>
             <div class="flex-1 min-w-0 min-h-[80px] sm:min-h-[84px]">

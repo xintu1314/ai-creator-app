@@ -27,6 +27,9 @@ function points_get_pricing_config(): array {
             // 按目标利润率约 100% 设计，且 4K 相比 2K +80%
             'banana' => ['2k' => 5, '4k' => 9],
             'banana_pro' => ['2k' => 10, '4k' => 18],
+            // nanobanana2 按 100% 利润目标定价：
+            // 2K 5 分，4K 9 分。
+            'nanobanana2' => ['2k' => 5, '4k' => 9],
         ],
         'video_cost_points' => [
             // 豆包视频（默认有声）：16元/百万tokens，100%利润率
@@ -35,10 +38,14 @@ function points_get_pricing_config(): array {
             'doubao_video' => [
                 'points_per_5s' => 55,
             ],
+            // 无形科技 veo3.1_pro：先按 5 点/秒计费
+            'veo3_1_pro' => [
+                'points_per_second' => 5,
+            ],
         ],
         'profit_target' => [
             'target' => '~100%',
-            'note' => 'banana_pro 2K固定10分，按成本0.3测算约100%利润；4K比2K多80%',
+            'note' => 'banana_pro 2K固定10分，veo3.1_pro 按文档 5点/秒计费。',
         ],
     ];
 }
@@ -50,6 +57,9 @@ function points_normalize_model(string $model): string {
     }
     if ($m === 'banana') {
         return 'banana';
+    }
+    if ($m === 'nanobanana2') {
+        return 'nanobanana2';
     }
     return $m;
 }
@@ -71,9 +81,19 @@ function points_calculate_image_points(string $model, string $quality): int {
 
 function points_calculate_video_points(string $model, int $duration = 5): int {
     $cfg = points_get_pricing_config();
-    $modelKey = 'doubao_video';
+    $modelKey = strtolower(trim($model));
+    if (in_array($modelKey, ['veo3.1-pro', 'veo3_1_pro', 'veo3.1_pro', 'veo3.1', 'veo3_1'], true)) {
+        $modelKey = 'veo3_1_pro';
+    } else {
+        $modelKey = 'doubao_video';
+    }
 
     $duration = max(1, min(30, $duration));
+    if ($modelKey === 'veo3_1_pro') {
+        $perSecond = (int)($cfg['video_cost_points'][$modelKey]['points_per_second'] ?? 5);
+        return max(1, $perSecond * $duration);
+    }
+
     $base = (int)($cfg['video_cost_points'][$modelKey]['points_per_5s'] ?? 55);
 
     // 5 秒为基准，按时长线性放大，最小 1 分

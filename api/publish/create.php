@@ -8,6 +8,17 @@ require_once __DIR__ . '/../common/response.php';
 require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/auth.php';
 
+function publish_templates_ensure_meta_column(PDO $pdo): void {
+    static $checked = false;
+    if ($checked) return;
+    try {
+        $pdo->exec("ALTER TABLE publish_templates ADD COLUMN IF NOT EXISTS meta_json JSONB");
+    } catch (Throwable $e) {
+        // ignore; legacy fallback remains available
+    }
+    $checked = true;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Method not allowed', 405);
     exit;
@@ -23,6 +34,17 @@ $category = $input['category'] ?? '';
 $title = trim($input['title'] ?? '');
 $content = trim($input['content'] ?? '');
 $image = trim($input['image'] ?? '');
+$referenceImageUrls = [];
+
+$isAllowedMediaUrl = static function ($url): bool {
+    return is_string($url) && preg_match('#^https?://#i', trim($url));
+};
+
+if (!empty($input['referenceImageUrls']) && is_array($input['referenceImageUrls'])) {
+    $referenceImageUrls = array_values(array_filter(array_map(static function ($url) {
+        return trim((string)$url);
+    }, $input['referenceImageUrls']), $isAllowedMediaUrl));
+}
 
 if (empty($modelId) || empty($category) || empty($title) || empty($content)) {
     json_error('请填写完整：模型、分类、标题、内容');
@@ -55,10 +77,15 @@ try {
     }
 
     $pdo = get_db();
+    publish_templates_ensure_meta_column($pdo);
+    $meta = [];
+    if (!empty($referenceImageUrls)) {
+        $meta['referenceImageUrls'] = $referenceImageUrls;
+    }
     try {
         $stmt = $pdo->prepare("
-            INSERT INTO publish_templates (user_id, content_type, model_id, model_name, category, title, content, image, review_status, is_online)
-            VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image, 'approved', true)
+            INSERT INTO publish_templates (user_id, content_type, model_id, model_name, category, title, content, image, meta_json, review_status, is_online)
+            VALUES (:user_id, :content_type, :model_id, :model_name, :category, :title, :content, :image, :meta_json, 'approved', true)
             RETURNING id
         ");
         $stmt->execute([
@@ -70,6 +97,7 @@ try {
             'title' => $title,
             'content' => $content,
             'image' => $image ?: null,
+            'meta_json' => json_encode((object)$meta, JSON_UNESCAPED_UNICODE),
         ]);
     } catch (Throwable $e) {
         // 兼容旧库：publish_templates 可能尚未包含 image/model_name 列

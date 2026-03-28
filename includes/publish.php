@@ -11,7 +11,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
 <div class="max-w-[1200px] mx-auto p-6">
     <h1 class="text-2xl font-semibold text-[#1A1A1A] mb-6">发布模板</h1>
     
-    <div class="bg-white rounded-lg p-6 border border-[#E5E5E5]">
+    <div class="bg-white rounded-xl p-6 border border-[#E5E5E5]">
         <form id="publish-form" method="POST" action="?tab=publish" onsubmit="return handlePublishSubmit(event)">
             <!-- Content Type Selection (Image/Video) -->
             <div class="mb-6">
@@ -21,7 +21,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                         type="button"
                         onclick="setContentType('image')"
                         id="btn-image"
-                        class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2 bg-[#3B82F6] text-white"
+                        class="px-4 py-2 rounded-xl transition-colors flex items-center gap-2 bg-[#3B82F6] text-white"
                     >
                         <i data-lucide="image" class="w-4 h-4"></i>
                         图片
@@ -30,7 +30,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                         type="button"
                         onclick="setContentType('video')"
                         id="btn-video"
-                        class="px-4 py-2 rounded-lg transition-colors flex items-center gap-2 bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5]"
+                        class="px-4 py-2 rounded-xl transition-colors flex items-center gap-2 bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5]"
                     >
                         <i data-lucide="video" class="w-4 h-4"></i>
                         视频
@@ -45,7 +45,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 <button
                     type="button"
                     onclick="openPublishModelDialog()"
-                    class="w-full px-4 py-2 border border-[#E5E5E5] rounded-lg flex items-center justify-between hover:border-[#3B82F6] transition-colors bg-white"
+                    class="w-full px-4 py-2 border border-[#E5E5E5] rounded-xl flex items-center justify-between hover:border-[#3B82F6] transition-colors bg-white"
                 >
                     <span id="selected-model-display" class="text-[#999999]">请选择模型</span>
                     <i data-lucide="chevron-down" class="w-4 h-4 text-[#666666]"></i>
@@ -62,7 +62,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                             type="button"
                             onclick="setCategory('<?= htmlspecialchars($category) ?>')"
                             id="category-btn-<?= htmlspecialchars($category) ?>"
-                            class="px-4 py-1.5 text-sm font-medium rounded-lg transition-colors bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5]"
+                            class="px-4 py-1.5 text-sm font-medium rounded-xl transition-colors bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5]"
                         >
                             <?= htmlspecialchars($category) ?>
                         </button>
@@ -77,7 +77,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 <div class="flex gap-4 items-start">
                     <div 
                         id="publish-image-upload" 
-                        class="w-[120px] h-[120px] border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all relative overflow-hidden"
+                        class="w-[120px] h-[120px] border-2 border-dashed border-[#E5E5E5] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all relative overflow-hidden"
                         onclick="document.getElementById('publish-image-input').click()"
                     >
                         <input type="file" id="publish-image-input" accept="image/*" class="hidden" onchange="handlePublishMediaUpload(this)">
@@ -91,13 +91,32 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 <input type="hidden" name="image" id="publish-image-url" value="">
             </div>
 
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-[#1A1A1A] mb-2">参考图</label>
+                <div class="flex gap-4 items-start">
+                    <label
+                        for="publish-ref-images-input"
+                        class="w-[120px] h-[120px] border-2 border-dashed border-[#E5E5E5] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all relative overflow-hidden text-center"
+                    >
+                        <i data-lucide="images" class="w-8 h-8 text-[#999999] mb-1"></i>
+                        <span class="text-xs text-[#999999]">点击上传</span>
+                        <span class="text-[10px] text-[#BBBBBB] mt-1">可多选</span>
+                    </label>
+                    <input type="file" id="publish-ref-images-input" accept="image/*" multiple class="hidden" onchange="handlePublishReferenceImagesUpload(this)">
+                    <div class="flex-1 min-w-0">
+                        <div id="publish-ref-images-preview" class="flex flex-wrap gap-3"></div>
+                        <p class="mt-2 text-xs text-[#666666]">支持多张参考图，图片模板和视频模板都可使用。</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Title -->
             <div class="mb-4">
                 <label class="block text-sm font-medium text-[#1A1A1A] mb-2">模板标题</label>
                 <input 
                     type="text" 
                     name="title"
-                    class="w-full px-4 py-2 border border-[#E5E5E5] rounded-lg focus:outline-none focus:border-[#3B82F6]"
+                    class="w-full px-4 py-2 border border-[#E5E5E5] rounded-xl focus:outline-none focus:border-[#3B82F6]"
                     placeholder="输入模板标题（提示词）"
                     required
                 />
@@ -108,7 +127,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 <label class="block text-sm font-medium text-[#1A1A1A] mb-2">模板内容（提示词）</label>
                 <textarea 
                     name="content"
-                    class="w-full px-4 py-2 border border-[#E5E5E5] rounded-lg focus:outline-none focus:border-[#3B82F6] min-h-[200px]"
+                    class="w-full px-4 py-2 border border-[#E5E5E5] rounded-xl focus:outline-none focus:border-[#3B82F6] min-h-[200px]"
                     placeholder="输入模板内容（提示词）"
                     required
                 ></textarea>
@@ -120,7 +139,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 id="publish-submit-btn"
                 disabled
                 title="请先上传预览图/视频"
-                class="px-6 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-6 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 发布
             </button>
@@ -128,11 +147,11 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
     </div>
 
     <!-- Publish History -->
-    <div class="mt-6 bg-white rounded-lg p-6 border border-[#E5E5E5]">
+    <div class="mt-6 bg-white rounded-xl p-6 border border-[#E5E5E5]">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-base font-medium text-[#1A1A1A]">我的发布历史</h2>
             <?php if ($currentUserId <= 0): ?>
-                <button type="button" onclick="openAuthDialog('login')" class="h-8 px-3 text-xs font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors">
+                <button type="button" onclick="openAuthDialog('login')" class="h-8 px-3 text-xs font-medium bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-xl transition-colors">
                     登录后查看
                 </button>
             <?php endif; ?>
@@ -148,6 +167,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                     $tplType = $tpl['type'] ?? 'image';
                     $mediaUrl = (string)($tpl['image'] ?? '');
                     $isPlaceholder = (strpos($mediaUrl, 'template-placeholder') !== false || $mediaUrl === '');
+                    $refUrls = is_array($tpl['referenceImageUrls'] ?? null) ? $tpl['referenceImageUrls'] : [];
                 ?>
                     <div class="bg-[#FAFAFA] border border-[#EAEAEA] rounded-xl overflow-hidden group" data-tpl-id="<?= (int)($tpl['id'] ?? 0) ?>" data-tpl-type="<?= htmlspecialchars($tplType) ?>">
                         <div class="relative aspect-[3/4] bg-[#F4F4F5]">
@@ -188,6 +208,23 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                         <div class="p-3">
                             <p class="text-sm font-medium text-[#1A1A1A] mb-1 line-clamp-1"><?= htmlspecialchars($tpl['title']) ?></p>
                             <p class="text-xs text-[#666666] line-clamp-1"><?= htmlspecialchars($tpl['model']) ?></p>
+                            <?php if (!empty($refUrls)): ?>
+                                <div class="mt-2 flex flex-wrap gap-1.5">
+                                    <?php foreach (array_slice($refUrls, 0, 4) as $idx => $refUrl): ?>
+                                        <img
+                                            src="<?= htmlspecialchars($refUrl) ?>"
+                                            alt="参考图 <?= (int)$idx + 1 ?>"
+                                            class="w-10 h-10 rounded-md object-cover border border-[#E5E5E5]"
+                                            loading="lazy"
+                                        />
+                                    <?php endforeach; ?>
+                                    <?php if (count($refUrls) > 4): ?>
+                                        <div class="w-10 h-10 rounded-md border border-[#E5E5E5] bg-white flex items-center justify-center text-[10px] text-[#666666]">
+                                            +<?= (int)(count($refUrls) - 4) ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -198,10 +235,10 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
 
 <!-- Cover Upload Dialog -->
 <div id="cover-dialog" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick="closeCoverDialog()">
-    <div class="bg-white rounded-lg max-w-md w-full mx-4" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
         <div class="px-6 py-4 border-b border-[#E5E5E5] flex items-center justify-between">
             <h2 class="text-base font-medium text-[#1A1A1A]">设置封面</h2>
-            <button onclick="closeCoverDialog()" class="p-2 hover:bg-[#F5F5F5] rounded-lg">
+            <button onclick="closeCoverDialog()" class="p-2 hover:bg-[#F5F5F5] rounded-xl">
                 <i data-lucide="x" class="w-5 h-5 text-[#666666]"></i>
             </button>
         </div>
@@ -209,7 +246,7 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
             <p id="cover-dialog-hint" class="text-sm text-[#666666] mb-4">上传视频或图片作为模板封面</p>
             <div
                 id="cover-upload-area"
-                class="w-full h-40 border-2 border-dashed border-[#E5E5E5] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all"
+                class="w-full h-40 border-2 border-dashed border-[#E5E5E5] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#3B82F6] hover:bg-[#F0F7FF] transition-all"
                 onclick="document.getElementById('cover-file-input').click()"
             >
                 <input type="file" id="cover-file-input" class="hidden" accept="image/*,video/*">
@@ -219,8 +256,8 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
                 </div>
             </div>
             <div class="mt-4 flex gap-2 justify-end">
-                <button type="button" onclick="closeCoverDialog()" class="px-4 py-2 text-sm text-[#666666] hover:bg-[#F5F5F5] rounded-lg">取消</button>
-                <button type="button" id="cover-submit-btn" onclick="submitCover()" disabled class="px-4 py-2 text-sm bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">确认</button>
+                <button type="button" onclick="closeCoverDialog()" class="px-4 py-2 text-sm text-[#666666] hover:bg-[#F5F5F5] rounded-xl">取消</button>
+                <button type="button" id="cover-submit-btn" onclick="submitCover()" disabled class="px-4 py-2 text-sm bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">确认</button>
             </div>
         </div>
     </div>
@@ -228,10 +265,10 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
 
 <!-- Model Select Dialog for Publish -->
 <div id="publish-model-dialog" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick="closePublishModelDialog()">
-    <div class="bg-white rounded-lg max-w-[680px] w-full mx-4" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-xl max-w-[680px] w-full mx-4" onclick="event.stopPropagation()">
         <div class="px-6 py-4 border-b border-[#E5E5E5] flex items-center justify-between">
             <h2 class="text-base font-medium text-[#1A1A1A]">选择模型</h2>
-            <button onclick="closePublishModelDialog()" class="p-2 hover:bg-[#F5F5F5] rounded-lg">
+            <button onclick="closePublishModelDialog()" class="p-2 hover:bg-[#F5F5F5] rounded-xl">
                 <i data-lucide="x" class="w-5 h-5 text-[#666666]"></i>
             </button>
         </div>
@@ -247,6 +284,8 @@ $availableModels = $contentType === 'image' ? $imageModels : $videoModels;
 const imageModels = <?= json_encode($imageModels, JSON_UNESCAPED_UNICODE) ?>;
 const videoModels = <?= json_encode($videoModels, JSON_UNESCAPED_UNICODE) ?>;
 let publishSubmitting = false;
+let publishReferenceImageUrls = [];
+const publishDefaultImageModelId = 'nanobanana2';
 
 let coverDialogTplId = 0;
 let coverDialogTplType = 'image';
@@ -358,6 +397,69 @@ function resetPublishMediaPreview() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+function renderPublishReferenceImages() {
+    const preview = document.getElementById('publish-ref-images-preview');
+    if (!preview) return;
+    if (!Array.isArray(publishReferenceImageUrls) || publishReferenceImageUrls.length === 0) {
+        preview.innerHTML = '';
+        return;
+    }
+    preview.innerHTML = publishReferenceImageUrls.map((url, index) => `
+        <div class="relative w-[120px] h-[120px] rounded-xl overflow-hidden border border-[#E5E5E5] bg-white">
+            <img src="${url}" alt="参考图${index + 1}" class="w-full h-full object-cover" />
+            <button
+                type="button"
+                onclick="removePublishReferenceImage(${index})"
+                class="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/65 text-white text-[10px] flex items-center justify-center hover:bg-black/80"
+                aria-label="删除参考图"
+            >×</button>
+        </div>
+    `).join('');
+}
+
+function removePublishReferenceImage(index) {
+    if (!Array.isArray(publishReferenceImageUrls)) return;
+    publishReferenceImageUrls.splice(index, 1);
+    renderPublishReferenceImages();
+}
+
+function resetPublishReferenceImages() {
+    publishReferenceImageUrls = [];
+    const input = document.getElementById('publish-ref-images-input');
+    if (input) input.value = '';
+    renderPublishReferenceImages();
+}
+
+async function handlePublishReferenceImagesUpload(input) {
+    const files = Array.from(input.files || []);
+    if (files.length === 0) return;
+    const preview = document.getElementById('publish-ref-images-preview');
+    if (preview) {
+        preview.insertAdjacentHTML('beforeend', '<div id="publish-ref-uploading" class="w-16 h-16 rounded-xl border border-dashed border-[#BFDBFE] bg-[#EFF6FF] flex items-center justify-center text-[10px] text-[#2563EB]">上传中</div>');
+    }
+    try {
+        for (const file of files) {
+            if (!file.type.startsWith('image/')) continue;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('prefix', 'assets/images/references');
+            const res = await fetch('api/upload/image.php', { method: 'POST', body: formData });
+            const data = await res.json();
+            const url = String((data && data.data && data.data.url) || '').trim();
+            if (data.success && /^https?:\/\//i.test(url) && !publishReferenceImageUrls.includes(url)) {
+                publishReferenceImageUrls.push(url);
+            }
+        }
+    } catch (err) {
+        alert('参考图上传失败，请稍后重试');
+    } finally {
+        const uploading = document.getElementById('publish-ref-uploading');
+        if (uploading) uploading.remove();
+        input.value = '';
+        renderPublishReferenceImages();
+    }
+}
+
 function updatePublishMediaUploaderByType(type) {
     const isVideo = type === 'video';
     document.getElementById('publish-media-label').textContent = isVideo ? '预览视频' : '预览图';
@@ -424,10 +526,7 @@ async function handlePublishMediaUpload(input) {
 
 function setContentType(type) {
     document.getElementById('content_type').value = type;
-    document.getElementById('selected_model').value = '';
-    document.getElementById('selected-model-display').textContent = '请选择模型';
-    document.getElementById('selected-model-display').classList.remove('text-[#1A1A1A]');
-    document.getElementById('selected-model-display').classList.add('text-[#999999]');
+    applyDefaultPublishModel(type);
     resetPublishMediaPreview();
     updatePublishMediaUploaderByType(type);
 
@@ -442,6 +541,20 @@ function setContentType(type) {
         document.getElementById('btn-image').classList.remove('bg-[#3B82F6]', 'text-white');
         document.getElementById('btn-image').classList.add('bg-[#F5F5F5]', 'text-[#666666]');
     }
+}
+
+function applyDefaultPublishModel(type) {
+    const models = type === 'video' ? videoModels : imageModels;
+    if (!Array.isArray(models) || models.length === 0) return;
+    let targetModel = models[0];
+    if (type === 'image') {
+        const preferred = models.find(model => String(model.id || '').toLowerCase() === publishDefaultImageModelId);
+        if (preferred) targetModel = preferred;
+    }
+    document.getElementById('selected_model').value = targetModel.id || '';
+    document.getElementById('selected-model-display').textContent = targetModel.name || '请选择模型';
+    document.getElementById('selected-model-display').classList.remove('text-[#999999]');
+    document.getElementById('selected-model-display').classList.add('text-[#1A1A1A]');
 }
 
 function setCategory(category) {
@@ -539,17 +652,17 @@ async function handlePublishSubmit(e) {
                 category,
                 title,
                 content,
-                image: image || undefined
+                image: image || undefined,
+                referenceImageUrls: publishReferenceImageUrls.slice()
             }),
         });
         const data = await response.json();
         if (data.success) {
             alert('发布成功！');
             form.reset();
-            document.getElementById('selected_model').value = '';
-            document.getElementById('selected-model-display').textContent = '请选择模型';
-            document.getElementById('selected-model-display').classList.add('text-[#999999]');
+            applyDefaultPublishModel(document.getElementById('content_type').value || 'image');
             resetPublishMediaPreview();
+            resetPublishReferenceImages();
             updatePublishMediaUploaderByType(document.getElementById('content_type').value);
             location.reload();
         } else {
@@ -571,5 +684,7 @@ async function handlePublishSubmit(e) {
 
 document.addEventListener('DOMContentLoaded', function() {
     updatePublishMediaUploaderByType(document.getElementById('content_type').value || 'image');
+    applyDefaultPublishModel(document.getElementById('content_type').value || 'image');
+    renderPublishReferenceImages();
 });
 </script>

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS assets (
     type VARCHAR(20) NOT NULL CHECK (type IN ('image', 'video')),
     model VARCHAR(100) NOT NULL,
     prompt TEXT,
+    meta_json JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS publish_templates (
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     image VARCHAR(500),
+    meta_json JSONB,
     review_status VARCHAR(20) NOT NULL DEFAULT 'approved' CHECK (review_status IN ('pending', 'approved', 'rejected')),
     is_online BOOLEAN NOT NULL DEFAULT true,
     review_note TEXT,

@@ -6,11 +6,29 @@ require_once __DIR__ . '/../common/db.php';
 
 const TEMPLATE_PLACEHOLDER_IMAGE = '/assets/images/template-placeholder.svg';
 
+function publish_templates_ensure_meta_column(PDO $pdo): void {
+    static $checked = false;
+    if ($checked) return;
+    try {
+        $pdo->exec("ALTER TABLE publish_templates ADD COLUMN IF NOT EXISTS meta_json JSONB");
+    } catch (Throwable $e) {
+        // ignore; fallback queries below remain compatible
+    }
+    $checked = true;
+}
+
+function publish_templates_decode_meta($rawMeta): array {
+    if (is_array($rawMeta)) return $rawMeta;
+    $decoded = json_decode((string)$rawMeta, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
 function get_templates($type = 'image') {
     try {
         $pdo = get_db();
+        publish_templates_ensure_meta_column($pdo);
         $stmt = $pdo->prepare("
-            SELECT id, title, image, model_name, model_id, content_type, category, content, review_status, is_online
+            SELECT id, title, image, model_name, model_id, content_type, category, content, meta_json, review_status, is_online
             FROM publish_templates
             WHERE content_type = :type
               AND review_status = 'approved'
@@ -34,6 +52,7 @@ function get_templates($type = 'image') {
             foreach ($legacyRows as $row) {
                 $row['image'] = '';
                 $row['model_name'] = $row['model_id'] ?? '';
+                $row['meta_json'] = '{}';
                 $rows[] = $row;
             }
         } catch (Throwable $e2) {
@@ -43,6 +62,7 @@ function get_templates($type = 'image') {
 
     $items = [];
     foreach ($rows as $row) {
+        $meta = publish_templates_decode_meta($row['meta_json'] ?? '{}');
         $items[] = [
             'id' => (string)$row['id'],
             'title' => $row['title'],
@@ -52,6 +72,8 @@ function get_templates($type = 'image') {
             'type' => $row['content_type'],
             'category' => $row['category'] ?? '',
             'prompt' => trim((string)($row['content'] ?? '')),
+            'referenceImageUrls' => is_array($meta['referenceImageUrls'] ?? null) ? array_values(array_filter($meta['referenceImageUrls'], 'is_string')) : [],
+            'meta' => $meta,
             'reviewStatus' => (string)($row['review_status'] ?? 'approved'),
             'isOnline' => (bool)($row['is_online'] ?? true),
         ];
@@ -68,8 +90,9 @@ function get_templates_by_user(int $userId, string $type = 'all', int $limit = 5
 
     try {
         $pdo = get_db();
+        publish_templates_ensure_meta_column($pdo);
         $sql = "
-            SELECT id, title, image, model_name, model_id, content_type, category, content
+            SELECT id, title, image, model_name, model_id, content_type, category, content, meta_json
             FROM publish_templates
             WHERE user_id = :user_id
         ";
@@ -103,6 +126,7 @@ function get_templates_by_user(int $userId, string $type = 'all', int $limit = 5
             foreach ($legacyRows as $row) {
                 $row['image'] = '';
                 $row['model_name'] = $row['model_id'] ?? '';
+                $row['meta_json'] = '{}';
                 $rows[] = $row;
             }
         } catch (Throwable $e2) {
@@ -112,6 +136,7 @@ function get_templates_by_user(int $userId, string $type = 'all', int $limit = 5
 
     $items = [];
     foreach ($rows as $row) {
+        $meta = publish_templates_decode_meta($row['meta_json'] ?? '{}');
         $items[] = [
             'id' => (string)$row['id'],
             'title' => $row['title'],
@@ -121,6 +146,8 @@ function get_templates_by_user(int $userId, string $type = 'all', int $limit = 5
             'type' => $row['content_type'],
             'category' => $row['category'] ?? '',
             'prompt' => trim((string)($row['content'] ?? '')),
+            'referenceImageUrls' => is_array($meta['referenceImageUrls'] ?? null) ? array_values(array_filter($meta['referenceImageUrls'], 'is_string')) : [],
+            'meta' => $meta,
         ];
     }
     return $items;
@@ -135,12 +162,13 @@ function get_user_templates($userId, $type = 'all') {
 
     try {
         $pdo = get_db();
+        publish_templates_ensure_meta_column($pdo);
     } catch (Throwable $e) {
         return [];
     }
 
     $sql = "
-        SELECT id, title, image, model_name, model_id, content_type, category, content
+        SELECT id, title, image, model_name, model_id, content_type, category, content, meta_json
         FROM publish_templates
         WHERE user_id = :user_id
     ";
@@ -157,6 +185,7 @@ function get_user_templates($userId, $type = 'all') {
 
     $items = [];
     foreach ($rows as $row) {
+        $meta = publish_templates_decode_meta($row['meta_json'] ?? '{}');
         $items[] = [
             'id' => (string)$row['id'],
             'title' => $row['title'],
@@ -166,6 +195,8 @@ function get_user_templates($userId, $type = 'all') {
             'type' => $row['content_type'],
             'category' => $row['category'] ?? '',
             'prompt' => trim((string)($row['content'] ?? '')),
+            'referenceImageUrls' => is_array($meta['referenceImageUrls'] ?? null) ? array_values(array_filter($meta['referenceImageUrls'], 'is_string')) : [],
+            'meta' => $meta,
         ];
     }
     return $items;

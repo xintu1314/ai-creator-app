@@ -17,6 +17,7 @@ function admin_ensure_schema(): void {
         $pdo->exec("ALTER TABLE publish_templates ADD COLUMN IF NOT EXISTS review_status VARCHAR(20) NOT NULL DEFAULT 'approved'");
         $pdo->exec("ALTER TABLE publish_templates ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT true");
         $pdo->exec("ALTER TABLE publish_templates ADD COLUMN IF NOT EXISTS review_note TEXT");
+        $pdo->exec("ALTER TABLE publish_templates ADD COLUMN IF NOT EXISTS meta_json JSONB");
 
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS tutorials (

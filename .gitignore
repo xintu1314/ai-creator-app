@@ -32,6 +32,9 @@ composer.phar
 uploads/*
 !uploads/.gitkeep
 
+# 数据库本地配置（含密码时勿提交）
+api/config/database.local.php
+
 # OSS 本地配置（含密钥时勿提交）
 api/config/oss.local.php
 

@@ -256,14 +256,150 @@ function wuyinkeji_extract_url_from_async_result($result) {
     if (!empty($result['result']) && is_array($result['result'])) {
         $first = $result['result'][0] ?? '';
         if (is_string($first) && str_starts_with($first, 'http')) return $first;
+        if (is_array($first)) {
+            foreach (['url', 'video_url', 'image_url'] as $key) {
+                if (!empty($first[$key]) && is_string($first[$key])) return $first[$key];
+            }
+        }
     }
-    $imageUrl = $result['image_url'] ?? $result['imageUrl'] ?? $result['url'] ?? $result['output'] ?? '';
+    $imageUrl = $result['image_url'] ?? $result['imageUrl'] ?? $result['video_url'] ?? $result['videoUrl'] ?? $result['url'] ?? $result['output'] ?? '';
     if (is_string($imageUrl) && $imageUrl !== '') return $imageUrl;
     if (!empty($result['images']) && is_array($result['images'])) {
         $first = $result['images'][0] ?? '';
         if (is_string($first) && $first !== '') return $first;
     }
+    if (!empty($result['videos']) && is_array($result['videos'])) {
+        $first = $result['videos'][0] ?? '';
+        if (is_string($first) && $first !== '') return $first;
+    }
     return '';
+}
+
+/**
+ * 提交视频生成任务
+ * @param string $modelId 'veo3_1_pro'
+ * @param string $prompt
+ * @param array $options ['firstFrameUrl','lastFrameUrl','urls','aspectRatio','size']
+ */
+function wuyinkeji_submit_video($modelId, $prompt, $options = []) {
+    $config = require __DIR__ . '/../config/ai.php';
+    $cfg = $config['wuyinkeji'] ?? null;
+    if (!$cfg || empty($cfg['api_key'])) {
+        return ['success' => false, 'message' => 'AI 配置未完成，请配置 api/config/ai.local.php'];
+    }
+
+    $baseUrl = rtrim($cfg['base_url'], '/');
+    $apiKey = $cfg['api_key'];
+    $videoEndpoints = $cfg['video_async_endpoints'] ?? [];
+    $endpoint = $videoEndpoints[$modelId] ?? ($videoEndpoints['veo3_1_pro'] ?? '/api/async/video_veo3.1_pro');
+
+    $aspectRatio = (string)($options['aspectRatio'] ?? '16:9');
+    if (!in_array($aspectRatio, ['16:9', '9:16'], true)) {
+        $aspectRatio = '16:9';
+    }
+
+    $size = strtolower((string)($options['size'] ?? '720p'));
+    if (!in_array($size, ['720p', '1080p', '4k'], true)) {
+        $size = '720p';
+    }
+
+    $firstFrameUrl = trim((string)($options['firstFrameUrl'] ?? ''));
+    $lastFrameUrl = trim((string)($options['lastFrameUrl'] ?? ''));
+    $urls = [];
+    if (!empty($options['urls']) && is_array($options['urls'])) {
+        $urls = array_values(array_slice(array_filter($options['urls'], 'is_string'), 0, 3));
+    }
+
+    $payload = [
+        'prompt' => $prompt,
+        'aspectRatio' => $aspectRatio,
+        'size' => $size,
+    ];
+    if ($firstFrameUrl !== '') $payload['firstFrameUrl'] = $firstFrameUrl;
+    if ($lastFrameUrl !== '') $payload['lastFrameUrl'] = $lastFrameUrl;
+    // 文档说明参考图与首尾帧不同时使用，优先首尾帧。
+    if ($firstFrameUrl === '' && $lastFrameUrl === '' && !empty($urls)) {
+        $payload['urls'] = $urls;
+    }
+
+    wuyinkeji_log('video.submit.begin', [
+        'model_id' => $modelId,
+        'endpoint' => $endpoint,
+        'payload' => $payload,
+        'api_key_masked' => wuyinkeji_mask_secret($apiKey),
+    ]);
+
+    $resp = wuyinkeji_http_post_json($baseUrl . $endpoint, $apiKey, $payload);
+    if (!$resp['ok']) {
+        wuyinkeji_log('video.submit.transport_error', [
+            'endpoint' => $endpoint,
+            'error_message' => $resp['message'] ?? '',
+            'http_code' => $resp['http_code'] ?? 0,
+            'raw_response' => $resp['raw_response'] ?? '',
+        ]);
+        return ['success' => false, 'message' => $resp['message'] ?? '提交失败'];
+    }
+
+    $data = $resp['data'];
+    wuyinkeji_log('video.submit.response', [
+        'endpoint' => $endpoint,
+        'response' => $data,
+    ]);
+    if (($data['code'] ?? 0) !== 200) {
+        return ['success' => false, 'message' => $data['msg'] ?? '提交失败'];
+    }
+    $taskId = $data['data']['id'] ?? null;
+    if ($taskId === null || $taskId === '') {
+        return ['success' => false, 'message' => '未获取到任务ID'];
+    }
+    return ['success' => true, 'task_id' => (string)$taskId];
+}
+
+/**
+ * 查询视频生成结果（async/detail）
+ */
+function wuyinkeji_query_video($taskId) {
+    $config = require __DIR__ . '/../config/ai.php';
+    $cfg = $config['wuyinkeji'] ?? null;
+    if (!$cfg || empty($cfg['api_key'])) return ['success' => false, 'message' => 'AI 配置未完成'];
+
+    $baseUrl = rtrim($cfg['base_url'], '/');
+    $apiKey = $cfg['api_key'];
+    $endpoint = $cfg['async_detail'] ?? '/api/async/detail';
+    wuyinkeji_log('video.query.begin', [
+        'task_id' => (string)$taskId,
+        'endpoint' => $endpoint,
+    ]);
+    $resp = wuyinkeji_http_get_json(
+        $baseUrl . $endpoint . '?id=' . urlencode((string)$taskId),
+        $apiKey,
+        'application/x-www-form-urlencoded;charset=utf-8'
+    );
+    if (!$resp['ok']) {
+        wuyinkeji_log('video.query.transport_error', [
+            'task_id' => (string)$taskId,
+            'error_message' => $resp['message'] ?? '',
+            'http_code' => $resp['http_code'] ?? 0,
+            'raw_response' => $resp['raw_response'] ?? '',
+        ]);
+        return ['success' => false, 'message' => $resp['message'] ?? '查询失败'];
+    }
+
+    $data = $resp['data'];
+    wuyinkeji_log('video.query.response', [
+        'task_id' => (string)$taskId,
+        'response' => $data,
+    ]);
+    if (($data['code'] ?? 0) !== 200) return ['success' => false, 'message' => $data['msg'] ?? '查询失败'];
+
+    $result = $data['data'] ?? [];
+    if (!is_array($result)) $result = [];
+    return [
+        'success' => true,
+        'status' => (int)($result['status'] ?? -1),
+        'result_url' => wuyinkeji_extract_url_from_async_result($result),
+        'fail_reason' => $result['fail_reason'] ?? ($result['message'] ?? ''),
+    ];
 }
 
 /**

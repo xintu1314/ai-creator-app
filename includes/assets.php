@@ -56,8 +56,12 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
                         $title = htmlspecialchars($item['title'] ?? $item['prompt'] ?? '');
                         $model = htmlspecialchars($item['model'] ?? '');
                         $createdAt = htmlspecialchars($item['createdAt'] ?? '');
+                        $meta = is_array($item['meta'] ?? null) ? $item['meta'] : [];
+                        $meta['type'] = $meta['type'] ?? ($item['type'] ?? 'image');
+                        $meta['model'] = $meta['model'] ?? ($item['model'] ?? '');
+                        $refUrls = is_array($meta['referenceImageUrls'] ?? null) ? $meta['referenceImageUrls'] : [];
                     ?>
-                        <div class="gen-result-card gen-fade-in" data-prompt="<?= htmlspecialchars($item['prompt'] ?? '') ?>" data-meta="<?= htmlspecialchars(json_encode(['type' => $item['type'] ?? 'image', 'model' => $model], JSON_UNESCAPED_UNICODE)) ?>">
+                        <div class="gen-result-card gen-fade-in" data-prompt="<?= htmlspecialchars($item['prompt'] ?? '') ?>" data-meta="<?= htmlspecialchars(json_encode($meta, JSON_UNESCAPED_UNICODE)) ?>">
                             <div class="px-5 pt-4 pb-2">
                                 <div class="text-sm font-medium text-[#1A1A1A] mb-2"><?= $title ?></div>
                                 <div class="flex flex-wrap gap-2 mb-3">
@@ -65,6 +69,13 @@ $defaultAspectRatio = $creationType === 'image' ? '3:4' : '16:9';
                                     <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]"><?= $model ?></span>
                                     <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]"><?= $createdAt ?></span>
                                 </div>
+                                <?php if (!empty($refUrls)): ?>
+                                    <div class="flex flex-wrap gap-2 mb-3">
+                                        <?php foreach (array_slice($refUrls, 0, 4) as $refUrl): ?>
+                                            <img src="<?= htmlspecialchars((string)$refUrl) ?>" alt="参考图" class="w-10 h-10 rounded-lg object-cover border border-[#E5E5E5]" loading="lazy" />
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                             <div class="px-5 pb-4">
                                 <div class="relative">

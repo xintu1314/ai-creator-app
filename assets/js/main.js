@@ -975,6 +975,15 @@ function closeParamsDialog() {
     }
 }
 
+// 有预览图时隐藏首帧/尾帧上的透明 file，避免挡住删除按钮；空状态时显示以便点击选取
+function setFrameFileInputHidden(frameType, hidden) {
+    const id = frameType === 'first-frame' ? 'first-frame-input' : 'last-frame-input';
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (hidden) el.classList.add('hidden');
+    else el.classList.remove('hidden');
+}
+
 // ============================
 // 上传：首帧/尾帧（OSS）
 // inputOrFile: <input> 或 File 对象（支持拖拽传入）
@@ -996,6 +1005,7 @@ async function handleFrameUpload(inputOrFile, previewId, frameType) {
         if (!res.ok) {
             const msg = (data && data.message) ? data.message : (`上传失败（HTTP ${res.status}）`);
             if (preview) preview.innerHTML = '<span class="text-xs text-red-500">' + escapeHtml(msg) + '</span>';
+            setFrameFileInputHidden(frameType, false);
             return;
         }
 
@@ -1003,6 +1013,7 @@ async function handleFrameUpload(inputOrFile, previewId, frameType) {
             const safeUrl = sanitizeMediaUrl(data.data.url);
             if (!safeUrl) {
                 if (preview) preview.innerHTML = '<span class="text-xs text-red-500">返回地址无效</span>';
+                setFrameFileInputHidden(frameType, false);
                 return;
             }
             if (!window.frameUrls) window.frameUrls = {};
@@ -1011,9 +1022,11 @@ async function handleFrameUpload(inputOrFile, previewId, frameType) {
         } else {
             const msg = (data && data.message) ? data.message : '上传失败（返回非 JSON 或空响应）';
             if (preview) preview.innerHTML = '<span class="text-xs text-red-500">' + escapeHtml(msg) + '</span>';
+            setFrameFileInputHidden(frameType, false);
         }
     } catch (err) {
         if (preview) preview.innerHTML = '<span class="text-xs text-red-500">上传失败</span>';
+        setFrameFileInputHidden(frameType, false);
     }
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
@@ -1107,12 +1120,11 @@ function renderFramePreview(previewId, frameType, imageUrl) {
     const preview = document.getElementById(previewId);
     if (!preview) return;
     const label = frameType === 'first-frame' ? '首帧' : '尾帧';
-    preview.style.position = 'relative';
-    preview.style.zIndex = '10';
     preview.innerHTML = '<div class="relative w-full h-full rounded-lg overflow-hidden">' +
         '<img src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(label) + '" class="w-full h-full object-cover rounded-lg" />' +
         '<button type="button" onclick="removeFrame(\'' + frameType + '\'); event.stopPropagation();" class="absolute top-0 right-0 w-5 h-5 bg-black/60 hover:bg-black/80 text-white text-xs rounded-bl flex items-center justify-center z-10">×</button>' +
         '</div>';
+    setFrameFileInputHidden(frameType, true);
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
@@ -1122,19 +1134,20 @@ function removeFrame(frameType) {
     const previewId = frameType === 'first-frame' ? 'first-frame-preview' : 'last-frame-preview';
     const preview = document.getElementById(previewId);
     if (preview) {
-        preview.style.position = '';
-        preview.style.zIndex = '';
         const label = frameType === 'first-frame' ? '首帧' : '尾帧';
-        preview.innerHTML = '<i data-lucide="plus" class="w-5 h-5 text-[#999999] mb-0.5 flex-shrink-0"></i>' +
+        const icon = frameType === 'first-frame' ? 'clapperboard' : 'flag';
+        preview.innerHTML = '<i data-lucide="' + icon + '" class="w-5 h-5 text-[#999999] mb-0.5 flex-shrink-0"></i>' +
             '<span class="text-[10px] text-[#999999] leading-tight text-center">' + label + '</span>' +
-            '<span class="text-[9px] text-[#BBBBBB] leading-tight text-center mt-0.5">点击或拖拽上传</span>';
+            '<span class="text-[9px] text-[#BBBBBB] leading-tight text-center mt-0.5">点击或拖拽</span>';
     }
+    setFrameFileInputHidden(frameType, false);
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 // 从视频 URL 提取帧并设置为首帧/尾帧
 function extractVideoFrameAndSetFrame(videoUrl, whichFrame, previewId, frameType) {
     var preview = document.getElementById(previewId);
+    setFrameFileInputHidden(frameType, true);
     if (preview) preview.innerHTML = '<span class="text-xs text-[#3B82F6]">提取中...</span>';
     var video = document.createElement('video');
     video.crossOrigin = 'anonymous';
@@ -1142,6 +1155,7 @@ function extractVideoFrameAndSetFrame(videoUrl, whichFrame, previewId, frameType
     video.playsInline = true;
     video.preload = 'metadata';
     video.onerror = function() {
+        setFrameFileInputHidden(frameType, false);
         if (preview) preview.innerHTML = '<span class="text-xs text-red-500">视频加载失败</span>';
     };
     video.onloadedmetadata = function() {
@@ -1155,6 +1169,7 @@ function extractVideoFrameAndSetFrame(videoUrl, whichFrame, previewId, frameType
         ctx.drawImage(video, 0, 0);
         canvas.toBlob(function(blob) {
             if (!blob) {
+                setFrameFileInputHidden(frameType, false);
                 if (preview) preview.innerHTML = '<span class="text-xs text-red-500">提取失败</span>';
                 return;
             }
@@ -1262,12 +1277,15 @@ function setAspectRatio(ratio, width, height) {
 
 function useTemplate(template) {
     var tplType = (template.type || 'image');
-    if (tplType === 'video') changeType('video');
+    var meta = template && typeof template.meta === 'object' && template.meta ? template.meta : {};
+    applyMetaToInputs({
+        type: tplType,
+        referenceImageUrls: Array.isArray(template.referenceImageUrls) ? template.referenceImageUrls : (Array.isArray(meta.referenceImageUrls) ? meta.referenceImageUrls : []),
+        firstFrameUrl: template.firstFrameUrl || meta.firstFrameUrl || '',
+        lastFrameUrl: template.lastFrameUrl || meta.lastFrameUrl || ''
+    }, template.prompt || template.title || '');
     const promptInput = getPromptInput();
-    if (promptInput) {
-        promptInput.value = template.prompt || template.title || '';
-        promptInput.focus();
-    }
+    if (promptInput) promptInput.focus();
     if (template.modelId && window.modelsData) {
         const modelId = template.modelId.toLowerCase().replace(/\s+/g, '-');
         const model = window.modelsData.find(function(m) {
@@ -1427,6 +1445,7 @@ function resolvePendingTask(task, status, payload, options) {
         taskId: task.taskId,
         type: task.type || 'image',
         prompt: task.prompt || '',
+        meta: task.meta || {},
         status: status,
         resultUrl: payload?.resultUrl || '',
         errorMessage: payload?.errorMessage || '',
@@ -1571,6 +1590,14 @@ function updateGeneratePointsDisplay() {
     const creationType = window.currentCreationType || 'image';
     if (creationType === 'video') {
         const pricing = window.pointsPricingVideo || {};
+        const videoModelId = (window.currentSettings?.selectedModel || document.getElementById('selected-model')?.dataset?.modelId || '').toLowerCase();
+        if (['veo3.1-pro', 'veo3.1_pro', 'veo3.1', 'veo3_1_pro'].includes(videoModelId)) {
+            const perSecond = Number(pricing?.veo3_1_pro?.points_per_second || 5);
+            const durationText = String(document.getElementById('video-duration')?.textContent || '5s');
+            const duration = Math.max(1, Math.min(30, parseInt(durationText, 10) || 5));
+            valueEl.textContent = Math.max(1, perSecond * duration);
+            return;
+        }
         const basePer5s = Number(pricing?.doubao_video?.points_per_5s || 55);
         const durationText = String(document.getElementById('video-duration')?.textContent || '5s');
         const duration = Math.max(1, Math.min(30, parseInt(durationText, 10) || 5));
@@ -1580,7 +1607,10 @@ function updateGeneratePointsDisplay() {
     }
     const pricing = window.pointsPricingImage || {};
     const modelId = (window.currentSettings?.selectedModel || document.getElementById('selected-model')?.textContent || 'banana').toLowerCase().replace(/\s+/g, '_');
-    const modelKey = modelId === 'banana_pro' || modelId === 'banana-pro' ? 'banana_pro' : 'banana';
+    let modelKey = modelId === 'banana_pro' || modelId === 'banana-pro' ? 'banana_pro' : modelId;
+    if (!pricing[modelKey]) {
+        modelKey = 'banana';
+    }
     const quality = (window.currentSettings?.quality || '2k').toLowerCase();
     const qualityKey = quality === '4k' ? '4k' : '2k';
     const count = Math.max(1, Math.min(4, Number(window.currentSettings?.count || 1)));
@@ -1695,6 +1725,10 @@ function createResultMessage(prompt, meta, imageUrl, slotIndex = 0, totalSlots =
             ? `<video src="${escapeHtml(imageUrl)}" controls class="w-full rounded-2xl shadow-sm block max-h-[500px] object-contain bg-[#FAFAFA] gen-asset-draggable cursor-grab active:cursor-grabbing" draggable="true" data-url="${escapeHtml(imageUrl)}" data-type="video"></video>`
             : `<img src="${escapeHtml(imageUrl)}" alt="生成结果" class="w-full rounded-2xl shadow-sm block max-h-[500px] object-contain bg-[#FAFAFA] gen-asset-draggable cursor-grab active:cursor-grabbing" draggable="true" data-url="${escapeHtml(imageUrl)}" data-type="image" />`)
         : '<div class="h-[200px] flex items-center justify-center text-[#999] rounded-2xl bg-[#F5F5F5]">暂无预览</div>';
+    const refUrls = Array.isArray(meta && meta.referenceImageUrls) ? meta.referenceImageUrls.filter(Boolean).slice(0, 4) : [];
+    const refsHtml = refUrls.length > 0
+        ? `<div class="flex flex-wrap gap-2 mb-3">${refUrls.map(url => `<img src="${escapeHtml(url)}" alt="参考图" class="w-10 h-10 rounded-lg object-cover border border-[#E5E5E5]" loading="lazy" />`).join('')}</div>`
+        : '';
 
     msg.innerHTML = `
         <div class="px-5 pt-4 pb-2">
@@ -1706,6 +1740,7 @@ function createResultMessage(prompt, meta, imageUrl, slotIndex = 0, totalSlots =
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.aspectRatio) || '')}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml(getCountBadgeText(meta))}</span>
             </div>
+            ${refsHtml}
         </div>
         <div class="px-5 pb-4">
             <div class="relative">
@@ -1740,6 +1775,11 @@ function createErrorMessage(prompt, meta, errorMsg, slotIndex = 0, totalSlots = 
     msg.dataset.prompt = prompt || '';
     msg.dataset.meta = JSON.stringify(meta || {});
 
+    const refUrls = Array.isArray(meta && meta.referenceImageUrls) ? meta.referenceImageUrls.filter(Boolean).slice(0, 4) : [];
+    const refsHtml = refUrls.length > 0
+        ? `<div class="flex flex-wrap gap-2 mb-3">${refUrls.map(url => `<img src="${escapeHtml(url)}" alt="参考图" class="w-10 h-10 rounded-lg object-cover border border-[#E5E5E5]" loading="lazy" />`).join('')}</div>`
+        : '';
+
     msg.innerHTML = `
         <div class="px-5 pt-4 pb-2">
             <div class="text-sm font-medium text-[#1A1A1A] mb-2">${escapeHtml(prompt || '')}</div>
@@ -1750,6 +1790,7 @@ function createErrorMessage(prompt, meta, errorMsg, slotIndex = 0, totalSlots = 
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml((meta && meta.aspectRatio) || '')}</span>
                 <span class="px-2.5 py-0.5 text-xs rounded-full bg-[#F5F5F5] text-[#666]">${escapeHtml(getCountBadgeText(meta))}</span>
             </div>
+            ${refsHtml}
         </div>
         <div class="px-5 pb-4">
             <div class="gen-error-card flex items-start gap-3">
@@ -1777,27 +1818,56 @@ function createErrorMessage(prompt, meta, errorMsg, slotIndex = 0, totalSlots = 
 // ============================
 // 消息操作：重新编辑 / 再次生成
 // ============================
+function applyMetaToInputs(meta, prompt) {
+    const m = meta || {};
+    if (m.type === 'video') changeType('video');
+    else changeType('image');
+
+    const input = getPromptInput();
+    if (input) input.value = prompt || '';
+
+    window.referenceImageUrls = [];
+    const refPreview = document.getElementById('ref-images-preview');
+    if (refPreview) refPreview.innerHTML = '';
+
+    removeFrame('first-frame');
+    removeFrame('last-frame');
+
+    if (Array.isArray(m.referenceImageUrls)) {
+        m.referenceImageUrls.forEach(function (url) {
+            if (url) addRefImageFromUrl(url);
+        });
+    }
+    if (m.firstFrameUrl) setFrameFromUrl(m.firstFrameUrl, 'first-frame-preview', 'first-frame');
+    if (m.lastFrameUrl) setFrameFromUrl(m.lastFrameUrl, 'last-frame-preview', 'last-frame');
+}
+
 function reEditFromMessage(btn) {
     const card = btn.closest('.gen-result-card');
     if (!card) return;
     const prompt = card.dataset.prompt || '';
-    const meta = card.dataset.meta ? JSON.parse(card.dataset.meta) : {};
-    if (meta.type === 'video') changeType('video');
-    const input = getPromptInput();
-    if (input) {
-        input.value = prompt;
-        input.focus();
+    let meta = {};
+    try {
+        meta = card.dataset.meta ? JSON.parse(card.dataset.meta) : {};
+    } catch (e) {
+        meta = {};
     }
+    applyMetaToInputs(meta, prompt);
+    const input = getPromptInput();
+    if (input) input.focus();
 }
 
 function regenerateFromMessage(btn) {
     const card = btn.closest('.gen-result-card');
     if (!card) return;
     const prompt = card.dataset.prompt || '';
-    const meta = card.dataset.meta ? JSON.parse(card.dataset.meta) : {};
-    if (meta.type === 'video') changeType('video');
-    const input = getPromptInput();
-    if (input) input.value = prompt;
+    let meta = {};
+    try {
+        meta = card.dataset.meta ? JSON.parse(card.dataset.meta) : {};
+    } catch (e) {
+        meta = {};
+    }
+    applyMetaToInputs(meta, prompt);
     handleGenerate();
 }
 
@@ -1975,6 +2045,13 @@ async function handleGenerate() {
         aspectRatio: aspectRatio,
         count: type === 'video' ? 1 : Number(settings.count || 1),
     };
+    if (window.referenceImageUrls && window.referenceImageUrls.length > 0) {
+        meta.referenceImageUrls = window.referenceImageUrls.slice();
+    }
+    if (type === 'video' && window.frameUrls) {
+        if (window.frameUrls['first-frame']) meta.firstFrameUrl = window.frameUrls['first-frame'];
+        if (window.frameUrls['last-frame']) meta.lastFrameUrl = window.frameUrls['last-frame'];
+    }
 
     const payload = {
         prompt,
@@ -2004,6 +2081,10 @@ async function handleGenerate() {
     setGeneratingNow(true);
     window.__batchState = null;
     showGenerationProgress(prompt, meta, meta.count);
+    const slotCountForSubmit = Math.max(1, Math.min(4, Number(meta.count || 1)));
+    for (let si = 0; si < slotCountForSubmit; si++) {
+        updateGenerationProgress(4, `第${si + 1}张 正在提交任务...`, si);
+    }
 
     try {
         const response = await fetch('api/generation/create.php', {
@@ -2050,12 +2131,16 @@ async function handleGenerate() {
                 }
 
                 updateStatusBar(`0/${slotCount} 生成中...`);
+                for (let pi = 0; pi < slotCount; pi++) {
+                    updateGenerationProgress(8, `第${pi + 1}张 已提交，同步生成进度...`, pi);
+                }
                 taskIds.forEach((id, idx) => {
                     pollTaskStatus(id, type, prompt, meta, idx, slotCount);
                 });
             } else if (type === 'video' && taskIds.length > 0 && status === 'processing') {
                 initGenerationBatch(1);
                 updateStatusBar('0/1 生成中...');
+                updateGenerationProgress(8, '视频任务已提交，正在查询状态...', 0);
                 pollTaskStatus(taskIds[0], type, prompt, meta, 0, 1);
             } else {
                 showGenerationError('不支持的任务类型或模型', prompt, meta, 0);
@@ -2075,7 +2160,8 @@ async function handleGenerate() {
 async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCount = 1) {
     const groupId = window.__activePollGroupId;
     const interval = 2500;
-    let progress = 5;
+    updateGenerationProgress(10, `第${slotIndex + 1}张 已连接，查询状态中...`, slotIndex);
+    let progress = 10;
     let emptyUrlRetry = 0;
     let networkErrorStreak = 0;
     let loopCount = 0;
@@ -2096,7 +2182,17 @@ async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCo
 
         try {
             const res = await fetch('api/generation/status.php?taskId=' + encodeURIComponent(taskId));
-            const data = await res.json();
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (parseErr) {
+                console.warn('[轮询] status 返回非 JSON:', text.slice(0, 300), parseErr);
+                bumpProgress(isVideoMeta(meta) ? `${Math.round(progress)}% 状态同步中...` : `第${slotIndex + 1}张 ${Math.round(progress)}% 状态同步中...`);
+                updateStatusBar('状态接口异常，重试中...');
+                await new Promise(r => setTimeout(r, 3000));
+                continue;
+            }
             networkErrorStreak = 0;
 
             if (!data.success) {
