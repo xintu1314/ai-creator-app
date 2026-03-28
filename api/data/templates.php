@@ -24,11 +24,22 @@ function publish_templates_decode_meta($rawMeta): array {
 }
 
 function get_templates($type = 'image') {
+    $pdo = null;
     try {
         $pdo = get_db();
         publish_templates_ensure_meta_column($pdo);
+
+        $hasMetaJson = false;
+        try {
+            $colStmt = $pdo->query("SELECT 1 FROM information_schema.columns WHERE table_name = 'publish_templates' AND column_name = 'meta_json' LIMIT 1");
+            $hasMetaJson = (bool)$colStmt->fetchColumn();
+        } catch (Throwable $columnErr) {
+            $hasMetaJson = false;
+        }
+
+        $metaSelect = $hasMetaJson ? 'meta_json' : "'{}'::text AS meta_json";
         $stmt = $pdo->prepare("
-            SELECT id, title, image, model_name, model_id, content_type, category, content, meta_json, review_status, is_online
+            SELECT id, title, image, model_name, model_id, content_type, category, content, {$metaSelect}, review_status, is_online
             FROM publish_templates
             WHERE content_type = :type
               AND review_status = 'approved'
@@ -40,6 +51,9 @@ function get_templates($type = 'image') {
     } catch (Throwable $e) {
         // 兼容旧库：publish_templates 可能尚未包含 image/model_name 列
         try {
+            if (!$pdo instanceof PDO) {
+                $pdo = get_db();
+            }
             $stmt = $pdo->prepare("
                 SELECT id, title, model_id, content_type, category, content
                 FROM publish_templates
@@ -91,8 +105,18 @@ function get_templates_by_user(int $userId, string $type = 'all', int $limit = 5
     try {
         $pdo = get_db();
         publish_templates_ensure_meta_column($pdo);
+
+        $hasMetaJson = false;
+        try {
+            $colStmt = $pdo->query("SELECT 1 FROM information_schema.columns WHERE table_name = 'publish_templates' AND column_name = 'meta_json' LIMIT 1");
+            $hasMetaJson = (bool)$colStmt->fetchColumn();
+        } catch (Throwable $columnErr) {
+            $hasMetaJson = false;
+        }
+
+        $metaSelect = $hasMetaJson ? 'meta_json' : "'{}'::text AS meta_json";
         $sql = "
-            SELECT id, title, image, model_name, model_id, content_type, category, content, meta_json
+            SELECT id, title, image, model_name, model_id, content_type, category, content, {$metaSelect}
             FROM publish_templates
             WHERE user_id = :user_id
         ";
@@ -167,8 +191,18 @@ function get_user_templates($userId, $type = 'all') {
         return [];
     }
 
+    $hasMetaJson = false;
+    try {
+        $colStmt = $pdo->query("SELECT 1 FROM information_schema.columns WHERE table_name = 'publish_templates' AND column_name = 'meta_json' LIMIT 1");
+        $hasMetaJson = (bool)$colStmt->fetchColumn();
+    } catch (Throwable $columnErr) {
+        $hasMetaJson = false;
+    }
+
+    $metaSelect = $hasMetaJson ? 'meta_json' : "'{}'::text AS meta_json";
+
     $sql = "
-        SELECT id, title, image, model_name, model_id, content_type, category, content, meta_json
+        SELECT id, title, image, model_name, model_id, content_type, category, content, {$metaSelect}
         FROM publish_templates
         WHERE user_id = :user_id
     ";

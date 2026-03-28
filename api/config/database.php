@@ -1,13 +1,23 @@
 <?php
 /**
  * 数据库配置 - PostgreSQL
- * 生产环境建议使用 getenv() 读取环境变量
+ * 优先级：环境变量 > database.local.php > 默认值
  */
-return [
-    'host' => '127.0.0.1',
-    'port' => 5432,
-    'dbname' => 'ai_creator',
-    'user' => 'believer',
-    'password' => '',
+$config = [
+    'host' => getenv('DB_HOST') ?: '127.0.0.1',
+    'port' => (int)(getenv('DB_PORT') ?: 5432),
+    'dbname' => getenv('DB_NAME') ?: 'ai_creator',
+    'user' => getenv('DB_USER') ?: 'believer',
+    'password' => getenv('DB_PASSWORD') ?: '',
     'charset' => 'UTF8',
 ];
+
+$localFile = __DIR__ . '/database.local.php';
+if (file_exists($localFile)) {
+    $local = require $localFile;
+    if (is_array($local)) {
+        $config = array_merge($config, $local);
+    }
+}
+
+return $config;
