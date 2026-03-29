@@ -57,7 +57,20 @@ function tasks_get_by_id(string $taskId, int $userId = 0): ?array {
 
 function tasks_count_active(?string $providerModel = null): int {
     $pdo = tasks_get_db();
-    $sql = "SELECT COUNT(*) FROM tasks WHERE status = 'processing'";
+    $sql = "
+        SELECT COUNT(*)
+        FROM tasks
+        WHERE status = 'processing'
+          AND COALESCE(provider, '') <> ''
+          AND COALESCE(provider_model, '') <> ''
+          AND (
+              started_at IS NOT NULL
+              OR next_poll_at IS NOT NULL
+              OR COALESCE(external_task_id, '') <> ''
+              OR COALESCE(result_url, '') <> ''
+              OR sync_status IN ('queued', 'processing')
+          )
+    ";
     $params = [];
     if ($providerModel !== null && trim($providerModel) !== '') {
         $sql .= " AND provider_model = :provider_model";
