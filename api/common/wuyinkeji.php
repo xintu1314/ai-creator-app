@@ -102,6 +102,18 @@ function wuyinkeji_is_unbound_param_error($msg) {
     return str_contains($msg, '未绑定的参数') || str_contains(strtolower($msg), 'unbound');
 }
 
+function wuyinkeji_resolve_config(array $options = []): array {
+    $config = require __DIR__ . '/../config/ai.php';
+    $cfg = is_array($config['wuyinkeji'] ?? null) ? $config['wuyinkeji'] : [];
+    if (!empty($options['base_url_override'])) {
+        $cfg['base_url'] = (string)$options['base_url_override'];
+    }
+    if (!empty($options['api_key_override'])) {
+        $cfg['api_key'] = (string)$options['api_key_override'];
+    }
+    return $cfg;
+}
+
 /**
  * 提交图片生成任务
  * @param string $modelId 'banana' | 'banana_pro'
@@ -109,8 +121,7 @@ function wuyinkeji_is_unbound_param_error($msg) {
  * @param array  $options ['imageSize','aspectRatio','urls','count']
  */
 function wuyinkeji_submit_image($modelId, $prompt, $options = []) {
-    $config = require __DIR__ . '/../config/ai.php';
-    $cfg = $config['wuyinkeji'] ?? null;
+    $cfg = wuyinkeji_resolve_config($options);
     if (!$cfg || empty($cfg['api_key'])) {
         return ['success' => false, 'message' => 'AI 配置未完成，请配置 api/config/ai.local.php'];
     }
@@ -282,8 +293,7 @@ function wuyinkeji_extract_url_from_async_result($result) {
  * @param array $options ['firstFrameUrl','lastFrameUrl','urls','aspectRatio','size']
  */
 function wuyinkeji_submit_video($modelId, $prompt, $options = []) {
-    $config = require __DIR__ . '/../config/ai.php';
-    $cfg = $config['wuyinkeji'] ?? null;
+    $cfg = wuyinkeji_resolve_config($options);
     if (!$cfg || empty($cfg['api_key'])) {
         return ['success' => false, 'message' => 'AI 配置未完成，请配置 api/config/ai.local.php'];
     }
@@ -358,9 +368,8 @@ function wuyinkeji_submit_video($modelId, $prompt, $options = []) {
 /**
  * 查询视频生成结果（async/detail）
  */
-function wuyinkeji_query_video($taskId) {
-    $config = require __DIR__ . '/../config/ai.php';
-    $cfg = $config['wuyinkeji'] ?? null;
+function wuyinkeji_query_video($taskId, array $options = []) {
+    $cfg = wuyinkeji_resolve_config($options);
     if (!$cfg || empty($cfg['api_key'])) return ['success' => false, 'message' => 'AI 配置未完成'];
 
     $baseUrl = rtrim($cfg['base_url'], '/');
@@ -405,9 +414,8 @@ function wuyinkeji_query_video($taskId) {
 /**
  * 查询图片生成结果（自动选择端点）
  */
-function wuyinkeji_query_image($taskId) {
-    $config = require __DIR__ . '/../config/ai.php';
-    $cfg = $config['wuyinkeji'] ?? null;
+function wuyinkeji_query_image($taskId, array $options = []) {
+    $cfg = wuyinkeji_resolve_config($options);
     if (!$cfg || empty($cfg['api_key'])) return ['success' => false, 'message' => 'AI 配置未完成'];
 
     $baseUrl = rtrim($cfg['base_url'], '/');

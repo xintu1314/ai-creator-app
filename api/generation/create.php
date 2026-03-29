@@ -1,13 +1,15 @@
 <?php
 /**
  * POST /api/generation/create.php
- * 创建生成任务（接入 banana、banana pro、GrsAI nanobanana2、豆包视频、veo3.1_pro）
+ * 创建生成任务（快速入队版）
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
-require_once __DIR__ . '/../common/db.php';
 require_once __DIR__ . '/../common/auth.php';
 require_once __DIR__ . '/../common/points.php';
+require_once __DIR__ . '/../common/tasks.php';
+require_once __DIR__ . '/../common/queue.php';
+require_once __DIR__ . '/../common/generation_jobs.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Method not allowed', 405);
@@ -78,456 +80,141 @@ if (!empty($input['lastFrameUrl'])) {
     $params['lastFrameUrl'] = $input['lastFrameUrl'];
 }
 
-// 映射前端参数到 API 格式
-$mapRatio = function ($r) {
-    $m = ['9:21' => '9:16'];
-    return $m[$r] ?? $r;
-};
-$mapQuality = function ($q) {
-    $q = strtolower($q ?? '2k');
-    return in_array($q, ['2k', '4k']) ? strtoupper($q) : '2K';
-};
-
 try {
     $userId = auth_get_current_user_id();
     if ($userId <= 0) {
         json_error('请先登录后再生成', 401);
         exit;
     }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
 
-    $pdo = get_db();
+    try {
+        $spec = generation_resolve_spec($type, (string)$model);
+    } catch (RuntimeException $e) {
+        json_error($e->getMessage());
+        exit;
+    }
+    $requestedCount = $type === 'image' ? max(1, min(4, (int)($params['count'] ?? 1))) : 1;
+    $pointsPerTask = $type === 'image'
+        ? points_calculate_image_points((string)$spec['provider_model'], (string)$params['quality'])
+        : points_calculate_video_points((string)$spec['provider_model'], max(1, min(30, (int)($params['duration'] ?? 5))));
 
-    if ($type === 'image' && in_array($model, ['banana', 'banana pro', 'banana-pro'])) {
-        // 图片：banana / banana pro
-        require_once __DIR__ . '/../common/wuyinkeji.php';
+    if ($type === 'video') {
+        $params['duration'] = max(1, min(30, (int)($params['duration'] ?? 5)));
+        if ((string)$spec['provider'] === 'wuyinkeji') {
+            $params['size'] = strtolower((string)($params['quality'] ?? 'standard')) === 'high' ? '1080p' : '720p';
+        }
+        if ((string)$spec['provider'] === 'doubao') {
+            $params['cameraFixed'] = (bool)($input['cameraFixed'] ?? false);
+            $params['watermark'] = array_key_exists('watermark', $input) ? (bool)$input['watermark'] : true;
+        }
+    }
 
-        $modelId = ($model === 'banana-pro' || $model === 'banana pro') ? 'banana_pro' : 'banana';
-        $options = [
-            'imageSize' => $mapQuality($params['quality']),
-            'aspectRatio' => $mapRatio($params['aspectRatio']),
-            'urls' => $params['referenceImageUrls'] ?? [],
-            'count' => $params['count'],
-        ];
+    $taskIds = [];
+    $submittedCount = 0;
+    $lastConsumeError = '';
 
-        // 张数逻辑：接口本身不支持 quantity 时，这里按张数循环提交单张任务
-        $requestedCount = max(1, min(4, (int)($params['count'] ?? 1)));
-        $localTaskIds = [];
-        $submittedCount = 0;
-        $pointsPerTask = points_calculate_image_points($modelId, (string)$params['quality']);
-        $lastConsumeError = '';
-
-        $stmt = $pdo->prepare("
-            INSERT INTO tasks (id, user_id, type, status, params_json)
-            VALUES (:id, :user_id, :type, 'processing', :params)
-        ");
-
-        for ($i = 0; $i < $requestedCount; $i++) {
-            $loopTaskId = $i === 0 ? $taskId : ('task_' . uniqid() . '_' . time() . '_' . $i);
-
-            $consumeRet = points_consume(
-                $userId,
-                $pointsPerTask,
-                'generate_consume',
-                '图片生成扣费',
-                [
-                    'taskId' => $loopTaskId,
-                    'model' => $modelId,
-                    'quality' => strtolower((string)$params['quality']),
-                    'index' => $i + 1,
-                    'requestedCount' => $requestedCount,
-                ]
-            );
-            if (!$consumeRet['success']) {
-                $lastConsumeError = $consumeRet['message'] ?? '积分不足';
-                if ($submittedCount === 0) {
-                    json_error($lastConsumeError);
-                    exit;
-                }
-                break;
+    for ($i = 0; $i < $requestedCount; $i++) {
+        $loopTaskId = $i === 0 ? $taskId : ('task_' . uniqid() . '_' . time() . '_' . $i);
+        $consumeRet = points_consume(
+            $userId,
+            $pointsPerTask,
+            'generate_consume',
+            $type === 'video' ? '视频生成扣费' : '图片生成扣费',
+            [
+                'taskId' => $loopTaskId,
+                'model' => (string)$spec['provider_model'],
+                'quality' => strtolower((string)($params['quality'] ?? '')),
+                'duration' => (int)($params['duration'] ?? 0),
+                'index' => $i + 1,
+                'requestedCount' => $requestedCount,
+            ]
+        );
+        if (!$consumeRet['success']) {
+            $lastConsumeError = $consumeRet['message'] ?? '积分不足';
+            if ($submittedCount === 0) {
+                json_error($lastConsumeError);
+                exit;
             }
+            break;
+        }
 
-            $result = wuyinkeji_submit_image($modelId, $prompt, $options);
-            if (function_exists('wuyinkeji_log')) {
-                wuyinkeji_log('create.submit_result', [
-                    'local_task_id' => $loopTaskId,
-                    'model' => $model,
-                    'model_id' => $modelId,
-                    'options' => $options,
-                    'submit_index' => $i + 1,
-                    'submit_total' => $requestedCount,
-                    'submit_result' => $result,
-                ]);
-            }
+        $loopParams = $params;
+        $loopParams['model'] = (string)$model;
+        $loopParams['provider'] = (string)$spec['provider'];
+        $loopParams['provider_model'] = (string)$spec['provider_model'];
+        $loopParams['count_requested'] = $requestedCount;
+        $loopParams['count_index'] = $i + 1;
+        $loopParams['points_charged'] = $pointsPerTask;
+        $loopParams['points_charged_paid'] = (int)($consumeRet['paidUsed'] ?? $pointsPerTask);
+        $loopParams['points_charged_bonus'] = (int)($consumeRet['bonusUsed'] ?? 0);
 
-            if (!$result['success']) {
-                // 本张提交失败时退回本张积分
-                points_refund_to_paid(
-                    $userId,
-                    $pointsPerTask,
-                    'generate_refund_submit_fail',
-                    '图片任务提交失败退回积分',
-                    [
-                        'taskId' => $loopTaskId,
-                        'model' => $modelId,
-                    ]
-                );
-
-                if ($submittedCount === 0) {
-                    json_error($result['message'] ?? '提交失败');
-                    exit;
-                }
-                break;
-            }
-
-            $loopParams = $params;
-            $loopParams['external_task_id'] = $result['task_id'];
-            $loopParams['count_requested'] = $requestedCount;
-            $loopParams['count_index'] = $i + 1;
-            $loopParams['count_total_submitted'] = $requestedCount;
-            $loopParams['points_charged'] = $pointsPerTask;
-            $loopParams['points_charged_paid'] = (int)($consumeRet['paidUsed'] ?? $pointsPerTask);
-            $loopParams['points_charged_bonus'] = (int)($consumeRet['bonusUsed'] ?? 0);
-
-            $stmt->execute([
+        $taskInserted = false;
+        try {
+            tasks_insert_queued([
                 'id' => $loopTaskId,
                 'user_id' => $userId,
                 'type' => $type,
-                'params' => json_encode($loopParams, JSON_UNESCAPED_UNICODE),
+                'status' => 'pending',
+                'provider' => (string)$spec['provider'],
+                'provider_model' => (string)$spec['provider_model'],
+                'params_json' => $loopParams,
+                'sync_status' => 'pending',
             ]);
-
-            $localTaskIds[] = $loopTaskId;
-            $submittedCount++;
-            if (function_exists('wuyinkeji_log')) {
-                wuyinkeji_log('create.db_inserted', [
-                    'local_task_id' => $loopTaskId,
-                    'external_task_id' => $loopParams['external_task_id'] ?? null,
-                    'status' => 'processing',
-                    'params' => $loopParams,
-                ]);
+            $taskInserted = true;
+            queue_push_submit_job($loopTaskId);
+        } catch (Throwable $queueErr) {
+            if ($taskInserted) {
+                tasks_mark_failed($loopTaskId, '队列服务不可用，请稍后重试');
             }
-        }
-
-        if ($submittedCount === 0) {
-            json_error($lastConsumeError ?: '任务提交失败');
-            exit;
-        }
-
-        $respMsg = $submittedCount > 1
-            ? "已提交 {$submittedCount} 个任务，请在资产中心查看全部结果"
-            : '任务已提交，请在资产中心查看生成结果';
-
-        $wallet = points_get_wallet_summary($userId);
-
-        json_success([
-            'taskId' => $localTaskIds[0],
-            'taskIds' => $localTaskIds,
-            'submittedCount' => $submittedCount,
-            'status' => 'processing',
-            'message' => $respMsg,
-            'pointsPerImage' => $pointsPerTask,
-            'wallet' => $wallet,
-        ]);
-    } elseif ($type === 'image' && strtolower((string)$model) === 'nanobanana2') {
-        // 图片：GrsAI — 仅快速提交任务，由 status.php + 前端轮询取结果（避免 create 长时间阻塞导致页面卡死）
-        require_once __DIR__ . '/../common/grsai.php';
-        require_once __DIR__ . '/../common/oss.php';
-        require_once __DIR__ . '/../data/assets.php';
-
-        $requestedCount = max(1, min(4, (int)($params['count'] ?? 1)));
-        $modelKey = 'nanobanana2';
-        $pointsPerTask = points_calculate_image_points($modelKey, (string)$params['quality']);
-        $localTaskIds = [];
-        $submittedCount = 0;
-        $lastConsumeError = '';
-
-        $stmtProcessing = $pdo->prepare("
-            INSERT INTO tasks (id, user_id, type, status, params_json)
-            VALUES (:id, :user_id, :type, 'processing', :params)
-        ");
-        $stmtCompleted = $pdo->prepare("
-            INSERT INTO tasks (id, user_id, type, status, params_json, result_url)
-            VALUES (:id, :user_id, :type, 'completed', :params, :result_url)
-        ");
-
-        for ($i = 0; $i < $requestedCount; $i++) {
-            $loopTaskId = $i === 0 ? $taskId : ('task_' . uniqid() . '_' . time() . '_' . $i);
-
-            $consumeRet = points_consume(
+            points_refund_to_paid(
                 $userId,
                 $pointsPerTask,
-                'generate_consume',
-                '图片生成扣费',
+                'generate_refund_queue_fail',
+                '任务入队失败退回积分',
                 [
                     'taskId' => $loopTaskId,
-                    'model' => $modelKey,
-                    'quality' => strtolower((string)$params['quality']),
-                    'index' => $i + 1,
-                    'requestedCount' => $requestedCount,
+                    'model' => (string)$spec['provider_model'],
                 ]
             );
-            if (!$consumeRet['success']) {
-                $lastConsumeError = $consumeRet['message'] ?? '积分不足';
-                if ($submittedCount === 0) {
-                    json_error($lastConsumeError);
-                    exit;
-                }
-                break;
+            $lastConsumeError = '任务入队失败，请稍后重试';
+            if ($submittedCount === 0) {
+                json_error($lastConsumeError);
+                exit;
             }
-
-            $gen = grsai_submit_nanobanana2($prompt, [
-                'aspectRatio' => $mapRatio((string)($params['aspectRatio'] ?? '3:4')),
-                'quality' => (string)($params['quality'] ?? '2k'),
-                'referenceImageUrls' => $params['referenceImageUrls'] ?? [],
-            ]);
-
-            if (!$gen['success']) {
-                points_refund_to_paid(
-                    $userId,
-                    $pointsPerTask,
-                    'generate_refund_submit_fail',
-                    '图片任务提交失败退回积分',
-                    [
-                        'taskId' => $loopTaskId,
-                        'model' => $modelKey,
-                    ]
-                );
-                if ($submittedCount === 0) {
-                    json_error($gen['message'] ?? '提交失败');
-                    exit;
-                }
-                break;
-            }
-
-            $loopParams = $params;
-            $loopParams['model'] = 'nanobanana2';
-            $loopParams['provider'] = 'grsai';
-            $loopParams['count_requested'] = $requestedCount;
-            $loopParams['count_index'] = $i + 1;
-            $loopParams['points_charged'] = $pointsPerTask;
-            $loopParams['points_charged_paid'] = (int)($consumeRet['paidUsed'] ?? $pointsPerTask);
-            $loopParams['points_charged_bonus'] = (int)($consumeRet['bonusUsed'] ?? 0);
-
-            if (!empty($gen['image_url'])) {
-                $imageUrl = (string)$gen['image_url'];
-                $stableUrl = $imageUrl ? oss_mirror_remote_media($imageUrl, 'image') : null;
-                if (!empty($stableUrl)) {
-                    $imageUrl = $stableUrl;
-                }
-                $stmtCompleted->execute([
-                    'id' => $loopTaskId,
-                    'user_id' => $userId,
-                    'type' => $type,
-                    'params' => json_encode($loopParams, JSON_UNESCAPED_UNICODE),
-                    'result_url' => $imageUrl,
-                ]);
-                $title = $prompt !== '' ? (function_exists('mb_substr') ? mb_substr($prompt, 0, 60) : substr($prompt, 0, 60)) : 'AI生成图片';
-                add_asset($title, $imageUrl, 'image', 'nanobanana2', $prompt, $userId, [
-                    'type' => 'image',
-                    'model' => 'nanobanana2',
-                    'quality' => $params['quality'] ?? '',
-                    'aspectRatio' => $params['aspectRatio'] ?? '',
-                    'referenceImageUrls' => $params['referenceImageUrls'] ?? [],
-                ]);
-            } else {
-                $extId = trim((string)($gen['task_id'] ?? ''));
-                if ($extId === '') {
-                    points_refund_to_paid(
-                        $userId,
-                        $pointsPerTask,
-                        'generate_refund_submit_fail',
-                        '图片任务未返回任务 ID 退回积分',
-                        [
-                            'taskId' => $loopTaskId,
-                            'model' => $modelKey,
-                        ]
-                    );
-                    if ($submittedCount === 0) {
-                        json_error('未能获取生成任务 ID，请稍后重试');
-                        exit;
-                    }
-                    break;
-                }
-                $loopParams['external_task_id'] = $extId;
-                $stmtProcessing->execute([
-                    'id' => $loopTaskId,
-                    'user_id' => $userId,
-                    'type' => $type,
-                    'params' => json_encode($loopParams, JSON_UNESCAPED_UNICODE),
-                ]);
-            }
-
-            $localTaskIds[] = $loopTaskId;
-            $submittedCount++;
+            break;
         }
 
-        if ($submittedCount === 0) {
-            json_error($lastConsumeError ?: '任务提交失败');
-            exit;
-        }
-
-        $respMsg = $submittedCount > 1
-            ? "已提交 {$submittedCount} 个任务，请在资产中心查看全部结果"
-            : '任务已提交，请在资产中心查看生成结果';
-
-        $wallet = points_get_wallet_summary($userId);
-
-        json_success([
-            'taskId' => $localTaskIds[0],
-            'taskIds' => $localTaskIds,
-            'submittedCount' => $submittedCount,
-            'status' => 'processing',
-            'message' => $respMsg,
-            'pointsPerImage' => $pointsPerTask,
-            'wallet' => $wallet,
-        ]);
-    } elseif ($type === 'video' && in_array($model, ['veo3.1-pro', 'veo3.1_pro', 'veo3.1', 'veo3_1_pro'])) {
-        // 视频：无形科技 veo3.1_pro
-        require_once __DIR__ . '/../common/wuyinkeji.php';
-
-        $duration = max(1, min(30, (int)($params['duration'] ?? 5)));
-        $pointsPerTask = points_calculate_video_points('veo3_1_pro', $duration);
-
-        $consumeRet = points_consume(
-            $userId,
-            $pointsPerTask,
-            'generate_consume',
-            '视频生成扣费',
-            [
-                'taskId' => $taskId,
-                'model' => 'veo3_1_pro',
-                'duration' => $duration,
-            ]
-        );
-        if (!$consumeRet['success']) {
-            json_error($consumeRet['message'] ?? '积分不足');
-            exit;
-        }
-
-        $size = strtolower((string)($params['quality'] ?? 'standard')) === 'high' ? '1080p' : '720p';
-        $submitRet = wuyinkeji_submit_video('veo3_1_pro', $prompt, [
-            'aspectRatio' => $mapRatio((string)($params['aspectRatio'] ?? '16:9')),
-            'size' => $size,
-            'firstFrameUrl' => (string)($params['firstFrameUrl'] ?? ''),
-            'lastFrameUrl' => (string)($params['lastFrameUrl'] ?? ''),
-            'urls' => $params['referenceImageUrls'] ?? [],
-        ]);
-
-        if (!$submitRet['success']) {
-            points_refund_to_paid(
-                $userId,
-                $pointsPerTask,
-                'generate_refund_submit_fail',
-                '视频任务提交失败退回积分',
-                [
-                    'taskId' => $taskId,
-                    'model' => 'veo3_1_pro',
-                ]
-            );
-            json_error($submitRet['message'] ?? '视频任务提交失败');
-            exit;
-        }
-
-        $params['external_task_id'] = (string)$submitRet['task_id'];
-        $params['provider'] = 'wuyinkeji';
-        $params['model'] = 'veo3.1-pro';
-        $params['size'] = $size;
-        $params['points_charged'] = $pointsPerTask;
-        $params['points_charged_paid'] = (int)($consumeRet['paidUsed'] ?? $pointsPerTask);
-        $params['points_charged_bonus'] = (int)($consumeRet['bonusUsed'] ?? 0);
-
-        $stmt = $pdo->prepare("
-            INSERT INTO tasks (id, user_id, type, status, params_json)
-            VALUES (:id, :user_id, :type, 'processing', :params)
-        ");
-        $stmt->execute([
-            'id' => $taskId,
-            'user_id' => $userId,
-            'type' => $type,
-            'params' => json_encode($params, JSON_UNESCAPED_UNICODE),
-        ]);
-
-        $wallet = points_get_wallet_summary($userId);
-        json_success([
-            'taskId' => $taskId,
-            'status' => 'processing',
-            'message' => '视频任务已提交，请在资产中心查看生成结果',
-            'pointsPerVideo' => $pointsPerTask,
-            'wallet' => $wallet,
-        ]);
-    } elseif ($type === 'video' && in_array($model, ['豆包视频', 'doubao-video', 'doubao-seedance-1-5-pro-251215'])) {
-        // 视频：豆包视频（火山方舟）
-        require_once __DIR__ . '/../common/doubao.php';
-
-        $duration = max(1, min(30, (int)($params['duration'] ?? 5)));
-        // 豆包视频默认有声，统一按有声定价
-        $pointsPerTask = points_calculate_video_points('doubao_video', $duration);
-
-        $consumeRet = points_consume(
-            $userId,
-            $pointsPerTask,
-            'generate_consume',
-            '视频生成扣费',
-            [
-                'taskId' => $taskId,
-                'model' => 'doubao_video',
-                'duration' => $duration,
-            ]
-        );
-        if (!$consumeRet['success']) {
-            json_error($consumeRet['message'] ?? '积分不足');
-            exit;
-        }
-
-        $submitRet = doubao_submit_video($prompt, [
-            'duration' => $duration,
-            'aspect_ratio' => $mapRatio((string)($params['aspectRatio'] ?? '16:9')),
-            'first_frame_url' => (string)($params['firstFrameUrl'] ?? ''),
-            'camera_fixed' => (bool)($input['cameraFixed'] ?? false),
-            'watermark' => array_key_exists('watermark', $input) ? (bool)$input['watermark'] : true,
-        ]);
-
-        if (!$submitRet['success']) {
-            points_refund_to_paid(
-                $userId,
-                $pointsPerTask,
-                'generate_refund_submit_fail',
-                '视频任务提交失败退回积分',
-                [
-                    'taskId' => $taskId,
-                    'model' => 'doubao_video',
-                ]
-            );
-            json_error($submitRet['message'] ?? '视频任务提交失败');
-            exit;
-        }
-
-        $params['external_task_id'] = (string)$submitRet['task_id'];
-        $params['points_charged'] = $pointsPerTask;
-        $params['points_charged_paid'] = (int)($consumeRet['paidUsed'] ?? $pointsPerTask);
-        $params['points_charged_bonus'] = (int)($consumeRet['bonusUsed'] ?? 0);
-
-        $stmt = $pdo->prepare("
-            INSERT INTO tasks (id, user_id, type, status, params_json)
-            VALUES (:id, :user_id, :type, 'processing', :params)
-        ");
-        $stmt->execute([
-            'id' => $taskId,
-            'user_id' => $userId,
-            'type' => $type,
-            'params' => json_encode($params, JSON_UNESCAPED_UNICODE),
-        ]);
-
-        $wallet = points_get_wallet_summary($userId);
-        json_success([
-            'taskId' => $taskId,
-            'status' => 'processing',
-            'message' => '视频任务已提交，请在资产中心查看生成结果',
-            'pointsPerVideo' => $pointsPerTask,
-            'wallet' => $wallet,
-        ]);
-    } else {
-        json_error('不支持的模型：' . $model);
+        $taskIds[] = $loopTaskId;
+        $submittedCount++;
     }
+
+    if ($submittedCount === 0) {
+        json_error($lastConsumeError ?: '任务提交失败');
+        exit;
+    }
+
+    $wallet = points_get_wallet_summary($userId);
+    $respMsg = $submittedCount > 1
+        ? "已提交 {$submittedCount} 个任务，已进入生成队列"
+        : '任务已提交，已进入生成队列';
+
+    $data = [
+        'taskId' => $taskIds[0],
+        'taskIds' => $taskIds,
+        'submittedCount' => $submittedCount,
+        'status' => 'processing',
+        'message' => $respMsg,
+        'wallet' => $wallet,
+    ];
+    if ($type === 'image') {
+        $data['pointsPerImage'] = $pointsPerTask;
+    } else {
+        $data['pointsPerVideo'] = $pointsPerTask;
+    }
+    json_success($data);
 } catch (Throwable $e) {
     json_exception('任务创建失败，请稍后重试', $e, 500);
 }

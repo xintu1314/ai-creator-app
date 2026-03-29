@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS assets (
 
 CREATE INDEX IF NOT EXISTS idx_assets_user_type ON assets(user_id, type);
 CREATE INDEX IF NOT EXISTS idx_assets_created ON assets(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_assets_user_created_desc ON assets(user_id, created_at DESC);
 
 -- 发布模板表
 CREATE TABLE IF NOT EXISTS publish_templates (
@@ -42,6 +43,17 @@ CREATE TABLE IF NOT EXISTS tasks (
     user_id INTEGER DEFAULT 0,
     type VARCHAR(20) NOT NULL CHECK (type IN ('image', 'video')),
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    provider VARCHAR(50),
+    provider_model VARCHAR(100),
+    external_task_id VARCHAR(128),
+    provider_key_id VARCHAR(80),
+    submit_attempts INTEGER NOT NULL DEFAULT 0,
+    poll_attempts INTEGER NOT NULL DEFAULT 0,
+    next_poll_at TIMESTAMP,
+    queued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    sync_status VARCHAR(20) NOT NULL DEFAULT 'pending',
     params_json JSONB,
     result_url VARCHAR(500),
     error_message TEXT,

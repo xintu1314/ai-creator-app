@@ -4,10 +4,12 @@
  * 使用: php api/db/init.php
  */
 require_once __DIR__ . '/../common/db.php';
+require_once __DIR__ . '/../common/tasks.php';
 
 $schema = file_get_contents(__DIR__ . '/schema.sql');
 $pdo = get_db();
 $pdo->exec($schema);
+tasks_ensure_queue_schema($pdo);
 echo "✅ 表结构创建完成\n";
 
 // 轻量迁移：users 增加 phone 字段（兼容旧库）

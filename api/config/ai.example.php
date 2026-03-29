@@ -6,7 +6,11 @@
 return [
     'wuyinkeji' => [
         'api_key' => getenv('WUYIN_API_KEY') ?: 'your-wuyinkeji-api-key',
+        'api_keys' => [
+            // 'your-wuyinkeji-api-key-2',
+        ],
         'base_url' => 'https://api.wuyinkeji.com',
+        'submit_concurrency' => 6,
         // 文档接口（优先）
         'img_endpoints' => [
             'banana' => '/api/img/nanoBanana',
@@ -27,6 +31,16 @@ return [
         'draw_detail' => '/api/img/drawDetail',
         'async_detail' => '/api/async/detail',
     ],
+    'doubao' => [
+        'api_key' => getenv('ARK_API_KEY') ?: 'your-ark-api-key',
+        'api_keys' => [
+            // 'your-ark-api-key-2',
+        ],
+        'base_url' => getenv('ARK_BASE_URL') ?: 'https://ark.cn-beijing.volces.com/api/v3',
+        'model' => getenv('ARK_VIDEO_MODEL') ?: 'doubao-seedance-1-5-pro-251215',
+        'create_endpoint' => '/contents/generations/tasks',
+        'submit_concurrency' => 4,
+    ],
     'openai_hk' => [
         'api_key' => getenv('OPENAI_HK_API_KEY') ?: 'your-openai-hk-api-key',
         'base_url' => 'https://api.openai-hk.com',
@@ -36,11 +50,15 @@ return [
     ],
     'grsai' => [
         'api_key' => getenv('GRSAI_API_KEY') ?: 'sk-your-grsai-key',
+        'api_keys' => [
+            // 'sk-your-grsai-key-2',
+        ],
         'base_url' => 'https://grsai.dakka.com.cn',
         'submit_mode' => 'draw',
         'chat_path' => '/v1/chat/completions',
         'draw_endpoint' => '/v1/draw/nano-banana',
         'result_endpoint' => '/v1/draw/result',
         'nanobanana2_model' => 'nano-banana-2',
+        'submit_concurrency' => 4,
     ],
 ];

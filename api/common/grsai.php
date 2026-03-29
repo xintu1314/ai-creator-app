@@ -17,6 +17,17 @@ function grsai_config(): array {
     return $cfg;
 }
 
+function grsai_config_with_overrides(array $options = []): array {
+    $cfg = grsai_config();
+    if (!empty($options['base_url_override'])) {
+        $cfg['base_url'] = (string)$options['base_url_override'];
+    }
+    if (!empty($options['api_key_override'])) {
+        $cfg['api_key'] = (string)$options['api_key_override'];
+    }
+    return $cfg;
+}
+
 /** 优先 grsai.api_key，否则兼容旧版写在 openai_hk 里的同一枚 sk */
 function grsai_resolve_api_key(): string {
     $all = require __DIR__ . '/../config/ai.php';
@@ -25,6 +36,18 @@ function grsai_resolve_api_key(): string {
         return $g;
     }
     return trim((string)($all['openai_hk']['api_key'] ?? ''));
+}
+
+function grsai_resolve_api_key_with_options(array $options = []): string {
+    if (!empty($options['api_key_override'])) {
+        return trim((string)$options['api_key_override']);
+    }
+    $cfg = grsai_config_with_overrides($options);
+    $g = trim((string)($cfg['api_key'] ?? ''));
+    if ($g !== '') {
+        return $g;
+    }
+    return grsai_resolve_api_key();
 }
 
 function grsai_log(string $event, array $context = []): void {
@@ -376,7 +399,7 @@ function grsai_parse_sse_last_json(string $raw): ?array {
  * @return array{success:bool, phase:string, image_url?:string, message?:string}
  * phase: completed | failed | running
  */
-function grsai_query_draw_status(string $taskId): array {
+function grsai_query_draw_status(string $taskId, array $options = []): array {
     $taskId = trim($taskId);
     if ($taskId === '') {
         return ['success' => false, 'phase' => 'failed', 'message' => '缺少任务 ID'];
@@ -384,8 +407,8 @@ function grsai_query_draw_status(string $taskId): array {
     if (function_exists('set_time_limit')) {
         @set_time_limit(20);
     }
-    $cfg = grsai_config();
-    $apiKey = grsai_resolve_api_key();
+    $cfg = grsai_config_with_overrides($options);
+    $apiKey = grsai_resolve_api_key_with_options($options);
     if ($apiKey === '') {
         return ['success' => false, 'phase' => 'failed', 'message' => '未配置 GrsAI API Key'];
     }
@@ -437,8 +460,8 @@ function grsai_query_draw_status(string $taskId): array {
  * @return array{success:bool, message?:string, task_id?:string, image_url?:string, raw?:string}
  */
 function grsai_submit_nanobanana2(string $prompt, array $options = []): array {
-    $cfg = grsai_config();
-    $apiKey = grsai_resolve_api_key();
+    $cfg = grsai_config_with_overrides($options);
+    $apiKey = grsai_resolve_api_key_with_options($options);
     if ($apiKey === '') {
         return ['success' => false, 'message' => '未配置 GrsAI：请在 api/config/ai.local.php 中填写 grsai.api_key（或沿用 openai_hk.api_key），或设置环境变量 GRSAI_API_KEY'];
     }

@@ -1369,6 +1369,30 @@ function saveRecentResults(results) {
     }
 }
 
+const GEN_POLL_BACKOFF_MS = [3000, 5000, 8000, 12000];
+
+function getGenerationPollDelayMs(round) {
+    const index = Math.max(0, Math.min(GEN_POLL_BACKOFF_MS.length - 1, Number(round || 0)));
+    return GEN_POLL_BACKOFF_MS[index];
+}
+
+async function fetchGenerationStatuses(taskIds) {
+    const ids = Array.isArray(taskIds)
+        ? taskIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean)
+        : [];
+    if (!ids.length) return [];
+    const res = await fetch('api/generation/status_batch.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds: ids }),
+    });
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.data?.items)) {
+        throw new Error(data.message || '批量状态查询失败');
+    }
+    return data.data.items;
+}
+
 function upsertPendingTasks(taskIds, type, prompt, meta, totalCount) {
     const ids = Array.isArray(taskIds) ? taskIds.filter(Boolean) : [];
     if (ids.length === 0) return;
@@ -1475,22 +1499,23 @@ async function pollPendingTasksLightweight() {
     if (!pending.length) return;
     window.__pendingPollInFlight = true;
     try {
-        const checks = pending.slice(0, 8).map(async function (task) {
-            try {
-                const res = await fetch('api/generation/status.php?taskId=' + encodeURIComponent(task.taskId));
-                const data = await res.json();
-                if (!data.success) return;
-                const status = data.data?.status;
-                if (status === 'completed') {
-                    resolvePendingTask(task, 'completed', { resultUrl: data.data?.resultUrl || '' }, { renderInCreatePage: false });
-                } else if (status === 'failed') {
-                    resolvePendingTask(task, 'failed', { errorMessage: data.data?.errorMessage || '生成失败' }, { renderInCreatePage: false });
-                }
-            } catch (e) {
-                // ignore single task polling error
+        const slice = pending.slice(0, 20);
+        const statusItems = await fetchGenerationStatuses(slice.map(function (task) { return task.taskId; }));
+        const statusMap = {};
+        statusItems.forEach(function (item) {
+            if (item && item.taskId) statusMap[item.taskId] = item;
+        });
+        slice.forEach(function (task) {
+            const item = statusMap[task.taskId];
+            if (!item) return;
+            if (item.status === 'completed') {
+                resolvePendingTask(task, 'completed', { resultUrl: item.resultUrl || '' }, { renderInCreatePage: false });
+            } else if (item.status === 'failed') {
+                resolvePendingTask(task, 'failed', { errorMessage: item.errorMessage || '生成失败' }, { renderInCreatePage: false });
             }
         });
-        await Promise.all(checks);
+    } catch (e) {
+        // ignore batch polling error
     } finally {
         window.__pendingPollInFlight = false;
     }
@@ -1642,11 +1667,18 @@ function getCountBadgeText(meta) {
 }
 
 function initGenerationBatch(total) {
+    if (window.__activeGenerationPollTimer) {
+        clearTimeout(window.__activeGenerationPollTimer);
+        window.__activeGenerationPollTimer = null;
+    }
     window.__activePollGroupId = 'grp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     window.__batchState = {
         total: Math.max(1, Number(total || 1)),
         done: 0,
     };
+    window.__activeGenerationTasks = {};
+    window.__activeGenerationPollInFlight = false;
+    window.__activeGenerationPollRound = 0;
 }
 
 function completeOneGeneration() {
@@ -1665,6 +1697,13 @@ function completeOneGeneration() {
         setGeneratingNow(false);
         window.__activePollId = null;
         window.__activePollGroupId = null;
+        window.__activeGenerationTasks = {};
+        window.__activeGenerationPollInFlight = false;
+        window.__activeGenerationPollRound = 0;
+        if (window.__activeGenerationPollTimer) {
+            clearTimeout(window.__activeGenerationPollTimer);
+            window.__activeGenerationPollTimer = null;
+        }
         setGenerateBtnLoading(false);
         updateStatusBar(null);
     } else {
@@ -2157,114 +2196,135 @@ async function handleGenerate() {
 // ============================
 // 轮询任务状态（图片生成）
 // ============================
-async function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCount = 1) {
-    const groupId = window.__activePollGroupId;
-    const interval = 2500;
-    updateGenerationProgress(10, `第${slotIndex + 1}张 已连接，查询状态中...`, slotIndex);
-    let progress = 10;
-    let emptyUrlRetry = 0;
-    let networkErrorStreak = 0;
-    let loopCount = 0;
-    const bumpProgress = function (customLabel) {
-        loopCount += 1;
-        progress = Math.min(99, progress + (loopCount < 40 ? 2 : 1));
-        const label = customLabel || (isVideoMeta(meta)
-            ? `${Math.round(progress)}% 生成中...`
-            : `第${slotIndex + 1}张 ${Math.round(progress)}% 生成中...`);
-        updateGenerationProgress(Math.round(progress), label, slotIndex);
-    };
+function stopActiveGenerationTaskPolling() {
+    if (window.__activeGenerationPollTimer) {
+        clearTimeout(window.__activeGenerationPollTimer);
+        window.__activeGenerationPollTimer = null;
+    }
+}
 
-    while (true) {
-        // 只允许当前批次轮询继续执行
+function scheduleActiveGenerationTaskPolling(delayMs) {
+    stopActiveGenerationTaskPolling();
+    const tasks = window.__activeGenerationTasks || {};
+    if (!Object.keys(tasks).length) return;
+    window.__activeGenerationPollTimer = setTimeout(runActiveGenerationTaskPolling, Math.max(0, Number(delayMs || 0)));
+}
+
+function pollTaskStatus(taskId, type, prompt, meta, slotIndex = 0, totalCount = 1) {
+    const groupId = window.__activePollGroupId;
+    const isVideo = isVideoMeta(meta);
+    updateGenerationProgress(10, isVideo ? '10% 已入队，等待处理...' : `第${slotIndex + 1}张 已入队，等待处理...`, slotIndex);
+
+    if (!window.__activeGenerationTasks) {
+        window.__activeGenerationTasks = {};
+    }
+    window.__activeGenerationTasks[taskId] = {
+        taskId: taskId,
+        type: type || 'image',
+        prompt: prompt || '',
+        meta: meta || {},
+        slotIndex: slotIndex,
+        totalCount: totalCount,
+        createdAt: Date.now(),
+        progress: 10,
+        loopCount: 0,
+        emptyUrlRetry: 0,
+        networkErrorStreak: 0,
+        groupId: groupId,
+    };
+    scheduleActiveGenerationTaskPolling(0);
+}
+
+async function runActiveGenerationTaskPolling() {
+    if (window.__activeGenerationPollInFlight) return;
+    const groupId = window.__activePollGroupId;
+    const taskMap = window.__activeGenerationTasks || {};
+    const tasks = Object.values(taskMap).filter(function (task) {
+        return task && task.groupId === groupId;
+    });
+    if (!tasks.length) {
+        stopActiveGenerationTaskPolling();
+        return;
+    }
+
+    window.__activeGenerationPollInFlight = true;
+    try {
+        const statusItems = await fetchGenerationStatuses(tasks.map(function (task) { return task.taskId; }));
         if (window.__activePollGroupId !== groupId) {
             return;
         }
+        const statusMap = {};
+        statusItems.forEach(function (item) {
+            if (item && item.taskId) statusMap[item.taskId] = item;
+        });
 
-        try {
-            const res = await fetch('api/generation/status.php?taskId=' + encodeURIComponent(taskId));
-            const text = await res.text();
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (parseErr) {
-                console.warn('[轮询] status 返回非 JSON:', text.slice(0, 300), parseErr);
-                bumpProgress(isVideoMeta(meta) ? `${Math.round(progress)}% 状态同步中...` : `第${slotIndex + 1}张 ${Math.round(progress)}% 状态同步中...`);
-                updateStatusBar('状态接口异常，重试中...');
-                await new Promise(r => setTimeout(r, 3000));
-                continue;
-            }
-            networkErrorStreak = 0;
+        tasks.forEach(function (task) {
+            const item = statusMap[task.taskId] || null;
+            if (!item) return;
+            task.networkErrorStreak = 0;
 
-            if (!data.success) {
-                // 查询接口偶发异常时，不立即失败，继续轮询
-                console.warn('[轮询告警] status接口返回失败，继续重试:', data.message);
-                bumpProgress(isVideoMeta(meta) ? `${Math.round(progress)}% 状态同步中...` : `第${slotIndex + 1}张 ${Math.round(progress)}% 状态同步中...`);
-                updateStatusBar('状态查询重试中...');
-                await new Promise(r => setTimeout(r, 3000));
-                continue;
-            }
-
-            const status = data.data?.status;
-            if (status === 'completed') {
-                const url = data.data?.resultUrl || '';
-                if (!url) {
-                    // completed 但URL为空：继续轮询几次等待落库
-                    console.warn('[生图调试] completed但无图片URL，继续等待:', JSON.stringify(data.data, null, 2));
-                    if (emptyUrlRetry < 10) {
-                        emptyUrlRetry++;
-                        updateGenerationProgress(99, '已完成，等待图片地址...', slotIndex);
-                        await new Promise(r => setTimeout(r, 3000));
-                        continue;
-                    }
+            if (item.status === 'completed') {
+                const url = item.resultUrl || '';
+                if (!url && task.emptyUrlRetry < 10) {
+                    task.emptyUrlRetry += 1;
+                    updateGenerationProgress(99, '已完成，等待图片地址...', task.slotIndex);
+                    return;
                 }
-                updateGenerationProgress(100, `第${slotIndex + 1}张完成`, slotIndex);
-                const doneTask = {
-                    taskId: taskId,
-                    type: type || 'image',
-                    prompt: prompt || '',
-                    meta: meta || {},
-                    createdAt: Date.now(),
-                };
-                resolvePendingTask(doneTask, 'completed', { resultUrl: url }, { renderInCreatePage: false });
-                setTimeout(function () {
-                    if (url) {
-                        showGenerationResult(url, prompt, meta, slotIndex);
-                    } else {
-                        showGenerationError('图片生成成功但未拿到地址，请去资产中心查看', prompt, meta, slotIndex);
-                    }
-                }, 400);
+                delete window.__activeGenerationTasks[task.taskId];
+                resolvePendingTask(task, 'completed', { resultUrl: url }, { renderInCreatePage: false });
+                if (url) {
+                    showGenerationResult(url, task.prompt, task.meta, task.slotIndex);
+                } else {
+                    showGenerationError('生成成功但未拿到地址，请去资产中心查看', task.prompt, task.meta, task.slotIndex);
+                }
                 return;
             }
 
-            if (status === 'failed') {
-                const failedTask = {
-                    taskId: taskId,
-                    type: type || 'image',
-                    prompt: prompt || '',
-                    meta: meta || {},
-                    createdAt: Date.now(),
-                };
-                resolvePendingTask(failedTask, 'failed', {
-                    errorMessage: data.data?.errorMessage || '生成失败，请尝试更换提示词或图片后重试',
+            if (item.status === 'failed') {
+                delete window.__activeGenerationTasks[task.taskId];
+                resolvePendingTask(task, 'failed', {
+                    errorMessage: item.errorMessage || '生成失败，请稍后重试',
                 }, { renderInCreatePage: false });
-                showGenerationError(data.data?.errorMessage || '生成失败，请尝试更换提示词或图片后重试', prompt, meta, slotIndex);
+                showGenerationError(item.errorMessage || '生成失败，请稍后重试', task.prompt, task.meta, task.slotIndex);
                 return;
             }
 
-            // 0=排队中 1=生成中：持续轮询，进度卡在 99%
-            bumpProgress();
-            await new Promise(r => setTimeout(r, interval));
-        } catch (e) {
-            console.error('[轮询异常]', e);
-            networkErrorStreak += 1;
-            if (networkErrorStreak >= 20) {
-                showGenerationError('网络异常次数过多，请检查网络后重试', prompt, meta, slotIndex);
+            task.loopCount += 1;
+            task.progress = Math.min(99, task.progress + (task.loopCount < 40 ? 2 : 1));
+            const label = isVideoMeta(task.meta)
+                ? `${Math.round(task.progress)}% 生成中...`
+                : `第${task.slotIndex + 1}张 ${Math.round(task.progress)}% 生成中...`;
+            updateGenerationProgress(Math.round(task.progress), label, task.slotIndex);
+        });
+
+        window.__activeGenerationPollRound = (window.__activeGenerationPollRound || 0) + 1;
+    } catch (e) {
+        tasks.forEach(function (task) {
+            task.networkErrorStreak += 1;
+            if (task.networkErrorStreak >= 20) {
+                delete window.__activeGenerationTasks[task.taskId];
+                resolvePendingTask(task, 'failed', {
+                    errorMessage: '网络异常次数过多，请检查网络后重试',
+                }, { renderInCreatePage: false });
+                showGenerationError('网络异常次数过多，请检查网络后重试', task.prompt, task.meta, task.slotIndex);
                 return;
             }
-            bumpProgress(isVideoMeta(meta) ? `${Math.round(progress)}% 网络重试中...` : `第${slotIndex + 1}张 ${Math.round(progress)}% 网络重试中...`);
-            updateStatusBar('网络抖动，自动重试中...');
-            await new Promise(r => setTimeout(r, 3500));
+            const label = isVideoMeta(task.meta)
+                ? `${Math.round(task.progress || 10)}% 网络重试中...`
+                : `第${task.slotIndex + 1}张 ${Math.round(task.progress || 10)}% 网络重试中...`;
+            updateGenerationProgress(Math.round(task.progress || 10), label, task.slotIndex);
+        });
+        updateStatusBar('状态同步中，自动重试...');
+    } finally {
+        window.__activeGenerationPollInFlight = false;
+        const remain = Object.values(window.__activeGenerationTasks || {}).filter(function (task) {
+            return task && task.groupId === groupId;
+        });
+        if (!remain.length) {
+            stopActiveGenerationTaskPolling();
+            return;
         }
+        scheduleActiveGenerationTaskPolling(getGenerationPollDelayMs(window.__activeGenerationPollRound || 0));
     }
 }
 

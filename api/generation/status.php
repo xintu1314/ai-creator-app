@@ -1,15 +1,12 @@
 <?php
 /**
  * GET /api/generation/status.php?taskId=xxx
- * 查询生成任务状态（轮询无形科技 / GrsAI / 豆包视频）
+ * 仅查询本地任务状态
  */
 require_once __DIR__ . '/../common/cors.php';
 require_once __DIR__ . '/../common/response.php';
-require_once __DIR__ . '/../common/db.php';
-require_once __DIR__ . '/../data/assets.php';
 require_once __DIR__ . '/../common/auth.php';
-require_once __DIR__ . '/../common/points.php';
-require_once __DIR__ . '/../common/oss.php';
+require_once __DIR__ . '/../common/tasks.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_error('Method not allowed', 405);
@@ -17,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $taskId = trim($_GET['taskId'] ?? '');
-if (empty($taskId)) {
+if ($taskId === '') {
     json_error('请提供 taskId');
     exit;
 }
@@ -28,339 +25,30 @@ try {
         json_error('请先登录', 401);
         exit;
     }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
 
-    $pdo = get_db();
-    $stmt = $pdo->prepare("SELECT id, user_id, type, status, params_json, result_url, error_message FROM tasks WHERE id = ? AND user_id = ?");
-    $stmt->execute([$taskId, $userId]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
+    $row = tasks_get_by_id($taskId, $userId);
     if (!$row) {
         json_error('任务不存在');
         exit;
     }
 
-    $params = json_decode($row['params_json'] ?? '{}', true) ?? [];
-    $externalId = $params['external_task_id'] ?? null;
-
-$ensureAssetExists = function (array $taskRow, array $taskParams): void {
-    $imageUrl = trim((string)($taskRow['result_url'] ?? ''));
-    if ($imageUrl === '') return;
-
-    $prompt = trim((string)($taskParams['prompt'] ?? ''));
-    $model = trim((string)($taskParams['model'] ?? 'AI'));
-    $title = $prompt !== '' ? $prompt : ('AI生成' . ($taskRow['type'] === 'video' ? '视频' : '图片'));
-    if (function_exists('mb_substr')) {
-        $title = mb_substr($title, 0, 60);
-    } else {
-        $title = substr($title, 0, 60);
+    $status = (string)($row['status'] ?? 'pending');
+    $publicStatus = in_array($status, ['completed', 'failed'], true) ? $status : 'processing';
+    $resultUrl = trim((string)($row['result_url'] ?? ''));
+    if ($publicStatus === 'completed' && $resultUrl === '') {
+        $publicStatus = 'processing';
     }
 
-    try {
-        $pdo = get_db();
-        $check = $pdo->prepare("SELECT id FROM assets WHERE user_id = :user_id AND image = :image AND type = :type LIMIT 1");
-        $check->execute([
-            'user_id' => (int)$taskRow['user_id'],
-            'image' => $imageUrl,
-            'type' => $taskRow['type'],
-        ]);
-        $exists = $check->fetch(PDO::FETCH_ASSOC);
-        if (!$exists) {
-            $assetMeta = [
-                'type' => $taskRow['type'] ?? 'image',
-                'model' => $taskParams['model'] ?? $model,
-                'quality' => $taskParams['quality'] ?? '',
-                'aspectRatio' => $taskParams['aspectRatio'] ?? '',
-                'referenceImageUrls' => $taskParams['referenceImageUrls'] ?? [],
-                'firstFrameUrl' => $taskParams['firstFrameUrl'] ?? '',
-                'lastFrameUrl' => $taskParams['lastFrameUrl'] ?? '',
-            ];
-            add_asset($title, $imageUrl, $taskRow['type'], $model, $prompt, (int)$taskRow['user_id'], $assetMeta);
-        }
-    } catch (Throwable $e) {
-        // 资产入库失败不影响状态接口返回
-    }
-};
-
-    // 已完成 → 直接返回
-    if ($row['status'] === 'completed') {
-        $ensureAssetExists($row, $params);
-        json_success([
-            'taskId'    => $row['id'],
-            'status'    => 'completed',
-            'resultUrl' => $row['result_url'],
-        ]);
-        exit;
-    }
-
-    // 已失败 → 直接返回
-    if ($row['status'] === 'failed') {
-        json_success([
-            'taskId'       => $row['id'],
-            'status'       => 'failed',
-            'errorMessage' => $row['error_message'] ?? '生成失败',
-        ]);
-        exit;
-    }
-
-    // 图片任务：GrsAI（nanobanana2）或无形科技
-    if ($row['type'] === 'image' && $externalId) {
-        $provider = (string)($params['provider'] ?? '');
-        if ($provider === 'grsai') {
-            require_once __DIR__ . '/../common/grsai.php';
-            grsai_log('status.poll', [
-                'local_task_id' => $taskId,
-                'external_task_id' => (string)$externalId,
-            ]);
-            $gr = grsai_query_draw_status((string)$externalId);
-            if (!$gr['success']) {
-                json_error($gr['message'] ?? '查询失败');
-                exit;
-            }
-            if ($gr['phase'] === 'completed') {
-                $imageUrl = trim((string)($gr['image_url'] ?? ''));
-                $stableUrl = $imageUrl ? oss_mirror_remote_media($imageUrl, 'image') : null;
-                if (!empty($stableUrl)) {
-                    $imageUrl = $stableUrl;
-                }
-                $stmt = $pdo->prepare("
-                    UPDATE tasks
-                    SET status = 'completed', result_url = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ? AND status <> 'completed'
-                ");
-                $stmt->execute([$imageUrl, $taskId]);
-                $justCompleted = $stmt->rowCount() > 0;
-                if ($justCompleted && !empty($imageUrl)) {
-                    $row['result_url'] = $imageUrl;
-                    $ensureAssetExists($row, $params);
-                }
-                json_success([
-                    'taskId'    => $taskId,
-                    'status'    => 'completed',
-                    'resultUrl' => $imageUrl,
-                ]);
-                exit;
-            }
-            if ($gr['phase'] === 'failed') {
-                $errMsg = (string)($gr['message'] ?? '生成失败');
-                $stmt = $pdo->prepare("UPDATE tasks SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> 'failed'");
-                $stmt->execute([$errMsg, $taskId]);
-                $justFailed = $stmt->rowCount() > 0;
-                if ($justFailed) {
-                    $refundPoints = (int)($params['points_charged'] ?? 0);
-                    if ($refundPoints > 0) {
-                        points_refund_to_paid(
-                            (int)$row['user_id'],
-                            $refundPoints,
-                            'generate_refund_failed',
-                            '图片生成失败退回积分',
-                            [
-                                'taskId' => $taskId,
-                                'model' => $params['model'] ?? '',
-                                'quality' => $params['quality'] ?? '',
-                            ]
-                        );
-                    }
-                }
-                json_success([
-                    'taskId'       => $taskId,
-                    'status'       => 'failed',
-                    'errorMessage' => $errMsg,
-                ]);
-                exit;
-            }
-            json_success([
-                'taskId' => $taskId,
-                'status' => 'processing',
-            ]);
-            exit;
-        }
-
-        require_once __DIR__ . '/../common/wuyinkeji.php';
-        if (function_exists('wuyinkeji_log')) {
-            wuyinkeji_log('status.poll_begin', [
-                'local_task_id' => $taskId,
-                'external_task_id' => (string)$externalId,
-                'db_status' => $row['status'],
-            ]);
-        }
-        $result = wuyinkeji_query_image($externalId);
-        if (function_exists('wuyinkeji_log')) {
-            wuyinkeji_log('status.poll_result', [
-                'local_task_id' => $taskId,
-                'external_task_id' => (string)$externalId,
-                'query_result' => $result,
-            ]);
-        }
-
-        if (!$result['success']) {
-            json_error($result['message'] ?? '查询失败');
-            exit;
-        }
-
-        $status = $result['status'];
-
-        if ($status === 2) {
-            // 成功
-            $imageUrl = $result['image_url'] ?? '';
-            $stableUrl = $imageUrl ? oss_mirror_remote_media($imageUrl, 'image') : null;
-            if (!empty($stableUrl)) {
-                $imageUrl = $stableUrl;
-            }
-            $stmt = $pdo->prepare("
-                UPDATE tasks
-                SET status = 'completed', result_url = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? AND status <> 'completed'
-            ");
-            $stmt->execute([$imageUrl, $taskId]);
-            $justCompleted = $stmt->rowCount() > 0;
-
-            // 首次完成时写入资产库；重复轮询不重复入库
-            if ($justCompleted && !empty($imageUrl)) {
-                $row['result_url'] = $imageUrl;
-                $ensureAssetExists($row, $params);
-            }
-            if (function_exists('wuyinkeji_log')) {
-                wuyinkeji_log('status.db_updated_completed', [
-                    'local_task_id' => $taskId,
-                    'external_task_id' => (string)$externalId,
-                    'image_url' => $imageUrl,
-                ]);
-            }
-            json_success([
-                'taskId'    => $taskId,
-                'status'    => 'completed',
-                'resultUrl' => $imageUrl,
-            ]);
-        } elseif ($status === 3) {
-            // 失败
-            $errMsg = $result['fail_reason'] ?: '生成失败';
-            $stmt = $pdo->prepare("UPDATE tasks SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> 'failed'");
-            $stmt->execute([$errMsg, $taskId]);
-            $justFailed = $stmt->rowCount() > 0;
-
-            if ($justFailed) {
-                $refundPoints = (int)($params['points_charged'] ?? 0);
-                if ($refundPoints > 0) {
-                    points_refund_to_paid(
-                        (int)$row['user_id'],
-                        $refundPoints,
-                        'generate_refund_failed',
-                        '图片生成失败退回积分',
-                        [
-                            'taskId' => $taskId,
-                            'model' => $params['model'] ?? '',
-                            'quality' => $params['quality'] ?? '',
-                        ]
-                    );
-                }
-            }
-
-            if (function_exists('wuyinkeji_log')) {
-                wuyinkeji_log('status.db_updated_failed', [
-                    'local_task_id' => $taskId,
-                    'external_task_id' => (string)$externalId,
-                    'error_message' => $errMsg,
-                    'just_failed' => $justFailed,
-                ]);
-            }
-            json_success([
-                'taskId'       => $taskId,
-                'status'       => 'failed',
-                'errorMessage' => $errMsg,
-            ]);
-        } else {
-            // 0=排队中 1=生成中
-            json_success([
-                'taskId' => $taskId,
-                'status' => 'processing',
-            ]);
-        }
-    } elseif ($row['type'] === 'video' && $externalId) {
-        $provider = (string)($params['provider'] ?? '');
-        if ($provider === 'wuyinkeji') {
-            require_once __DIR__ . '/../common/wuyinkeji.php';
-            $result = wuyinkeji_query_video((string)$externalId);
-        } else {
-            require_once __DIR__ . '/../common/doubao.php';
-            $result = doubao_query_video((string)$externalId);
-        }
-        if (!$result['success']) {
-            json_error($result['message'] ?? '查询失败');
-            exit;
-        }
-
-        $isCompleted = $provider === 'wuyinkeji'
-            ? ((int)($result['status'] ?? -1) === 2)
-            : (($result['status'] ?? '') === 'completed');
-        $isFailed = $provider === 'wuyinkeji'
-            ? ((int)($result['status'] ?? -1) === 3)
-            : (($result['status'] ?? '') === 'failed');
-
-        if ($isCompleted) {
-            $videoUrl = (string)($result['result_url'] ?? '');
-            $stableUrl = $videoUrl ? oss_mirror_remote_media($videoUrl, 'video') : null;
-            if (!empty($stableUrl)) {
-                $videoUrl = $stableUrl;
-            }
-            $stmt = $pdo->prepare("
-                UPDATE tasks
-                SET status = 'completed', result_url = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? AND status <> 'completed'
-            ");
-            $stmt->execute([$videoUrl, $taskId]);
-            $justCompleted = $stmt->rowCount() > 0;
-            if ($justCompleted && $videoUrl !== '') {
-                $row['result_url'] = $videoUrl;
-                $ensureAssetExists($row, $params);
-            }
-            json_success([
-                'taskId' => $taskId,
-                'status' => 'completed',
-                'resultUrl' => $videoUrl,
-            ]);
-            exit;
-        }
-
-        if ($isFailed) {
-            $errMsg = (string)($result['fail_reason'] ?? '视频生成失败');
-            $stmt = $pdo->prepare("UPDATE tasks SET status = 'failed', error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status <> 'failed'");
-            $stmt->execute([$errMsg, $taskId]);
-            $justFailed = $stmt->rowCount() > 0;
-
-            if ($justFailed) {
-                $refundPoints = (int)($params['points_charged'] ?? 0);
-                if ($refundPoints > 0) {
-                    points_refund_to_paid(
-                        (int)$row['user_id'],
-                        $refundPoints,
-                        'generate_refund_failed',
-                        '视频生成失败退回积分',
-                        [
-                            'taskId' => $taskId,
-                            'model' => $params['model'] ?? '',
-                            'duration' => $params['duration'] ?? 5,
-                        ]
-                    );
-                }
-            }
-            json_success([
-                'taskId' => $taskId,
-                'status' => 'failed',
-                'errorMessage' => $errMsg,
-            ]);
-            exit;
-        }
-
-        json_success([
-            'taskId' => $taskId,
-            'status' => 'processing',
-        ]);
-    } else {
-        json_success([
-            'taskId' => $taskId,
-            'status' => $row['status'],
-        ]);
-    }
+    json_success([
+        'taskId' => (string)$row['id'],
+        'status' => $publicStatus,
+        'syncStatus' => (string)($row['sync_status'] ?? 'pending'),
+        'resultUrl' => $resultUrl,
+        'errorMessage' => (string)($row['error_message'] ?? ''),
+    ]);
 } catch (Throwable $e) {
-    json_exception('查询失败，请稍后重试', $e, 500);
+    json_exception('查询任务状态失败，请稍后重试', $e, 500);
 }

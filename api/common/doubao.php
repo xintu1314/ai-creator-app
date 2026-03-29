@@ -11,6 +11,20 @@ function doubao_config(): array {
     return $cfg;
 }
 
+function doubao_config_with_overrides(array $options = []): array {
+    $cfg = doubao_config();
+    if (!empty($options['base_url_override'])) {
+        $cfg['base_url'] = (string)$options['base_url_override'];
+    }
+    if (!empty($options['api_key_override'])) {
+        $cfg['api_key'] = (string)$options['api_key_override'];
+    }
+    if (!empty($options['model_override'])) {
+        $cfg['model'] = (string)$options['model_override'];
+    }
+    return $cfg;
+}
+
 function doubao_mask_secret(string $secret): string {
     $len = strlen($secret);
     if ($len <= 10) return str_repeat('*', $len);
@@ -143,7 +157,7 @@ function doubao_normalize_ratio(string $ratio): string {
 }
 
 function doubao_submit_video(string $prompt, array $options = []): array {
-    $cfg = doubao_config();
+    $cfg = doubao_config_with_overrides($options);
     $apiKey = trim((string)($cfg['api_key'] ?? ''));
     $baseUrl = trim((string)($cfg['base_url'] ?? ''));
     $model = trim((string)($options['model'] ?? ($cfg['model'] ?? '')));
@@ -228,8 +242,8 @@ function doubao_submit_video(string $prompt, array $options = []): array {
     ];
 }
 
-function doubao_query_video(string $taskId): array {
-    $cfg = doubao_config();
+function doubao_query_video(string $taskId, array $options = []): array {
+    $cfg = doubao_config_with_overrides($options);
     $apiKey = trim((string)($cfg['api_key'] ?? ''));
     $baseUrl = trim((string)($cfg['base_url'] ?? ''));
     $endpoint = trim((string)($cfg['create_endpoint'] ?? '/contents/generations/tasks'));

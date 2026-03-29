@@ -46,3 +46,6 @@ api/config/sms.local.php
 
 # 支付本地配置（含密钥时勿提交）
 api/config/payment.local.php
+
+# 队列/Redis 本地配置（含密码时勿提交）
+api/config/queue.local.php
